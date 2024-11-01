@@ -70,14 +70,12 @@ def test_patch_embed():
     # Pass the input tensor through the PatchEmbed instance
     output, output_n = patch_embed(dummy_tensor)
     
-    # Print the shape of the output tensor
-    print("Output shape:", output.shape)
-    print("Output_n shape:", output_n.shape)
-    
     # Verify the order of patches
     # For simplicity, we will print the indices of the patches in the output tensor
     # In a real test, you would compare the output tensor to an expected tensor
-    print(output[:,:,:], output_n[:,:,:])
+    for i in range(16):
+        print(f"Initial order index {i}: {output[0, i, :].detach().numpy()} -> " +
+              f"Custom order index {custom_order[i]}: {output_n[0, custom_order[i], :].detach().numpy()}")
 
 # Run the test
 test_patch_embed()
