@@ -279,6 +279,7 @@ def main(args):
         pin_memory=args.pin_mem,
         prefetch_factor=2,
         drop_last=True,
+        timeout=200
     )
     if args.ThreeAugment:
         data_loader_train.dataset.transform = new_data_aug_generator(args)
