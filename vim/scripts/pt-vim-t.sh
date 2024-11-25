@@ -16,7 +16,7 @@
 #     --no_amp
 CUDA_VISIBLE_DEVICES=0 python main.py \
     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
-    --batch-size 64 \
+    --batch-size 128 \
     --drop-path 0.0 \
     --epochs 100 \
     --weight-decay 0.1 \
