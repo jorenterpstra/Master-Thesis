@@ -22,14 +22,20 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                     device: torch.device, epoch: int, loss_scaler, amp_autocast, max_norm: float = 0,
                     model_ema: Optional[ModelEma] = None, mixup_fn: Optional[Mixup] = None,
                     set_training_mode=True, args = None):
+    print('direct na aanroep')
     model.train(set_training_mode)
+    print('model.train(set_training_mode)')
     metric_logger = utils.MetricLogger(delimiter="  ")
+    print('metric_logger = utils.MetricLogger(delimiter="  ")')
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    print('metric_logger.add_meter')
     header = 'Epoch: [{}]'.format(epoch)
+    print('header')
     print_freq = 10
     
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
+    print('if args.cosub')
         
     # debug
     # count = 0
