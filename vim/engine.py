@@ -51,6 +51,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         if args.bce_loss:
             targets = targets.gt(0.0).type(targets.dtype)
          
+        print("Calculate loss")
         with amp_autocast():
             outputs = model(samples, if_random_cls_token_position=args.if_random_cls_token_position, if_random_token_rank=args.if_random_token_rank)
             # outputs = model(samples)
@@ -68,7 +69,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 loss = torch.nan_to_num(loss)
 
         loss_value = loss.item()
-
+        print("Loss is: ", loss_value)
+        
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
             if args.if_continue_inf:
