@@ -277,6 +277,7 @@ def main(args):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=args.pin_mem,
+        prefetch_factor=2,
         drop_last=True,
     )
     if args.ThreeAugment:
@@ -287,6 +288,7 @@ def main(args):
         batch_size=int(1.5 * args.batch_size * 20),
         num_workers=args.num_workers,
         pin_memory=args.pin_mem,
+        prefetch_factor=2,
         drop_last=False
     )
     print(f"Train dataset has {len(dataset_train)} images, val has {len(dataset_val)} images")
