@@ -22,20 +22,14 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                     device: torch.device, epoch: int, loss_scaler, amp_autocast, max_norm: float = 0,
                     model_ema: Optional[ModelEma] = None, mixup_fn: Optional[Mixup] = None,
                     set_training_mode=True, args = None):
-    print('direct na aanroep')
     model.train(set_training_mode)
-    print('model.train(set_training_mode)')
     metric_logger = utils.MetricLogger(delimiter="  ")
-    print('metric_logger = utils.MetricLogger(delimiter="  ")')
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    print('metric_logger.add_meter')
     header = 'Epoch: [{}]'.format(epoch)
-    print('header')
     print_freq = 10
     
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
-    print('if args.cosub')
         
     # debug
     # count = 0
@@ -43,20 +37,16 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         # count += 1
         # if count > 20:
         #     break
-        print(1)
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
             torch.cuda.synchronize()
-        print(2)
         if args.cosub:
             samples = torch.cat((samples,samples),dim=0)
-        print(3)
         if args.bce_loss:
             targets = targets.gt(0.0).type(targets.dtype)
-        print(4) 
         with amp_autocast():
             outputs = model(samples, if_random_cls_token_position=args.if_random_cls_token_position, if_random_token_rank=args.if_random_token_rank)
             # outputs = model(samples)
@@ -68,13 +58,11 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 loss = loss + 0.25 * criterion(outputs[1], targets) 
                 loss = loss + 0.25 * criterion(outputs[0], outputs[1].detach().sigmoid())
                 loss = loss + 0.25 * criterion(outputs[1], outputs[0].detach().sigmoid()) 
-        print(5)
+
         if args.if_nan2num:
             with amp_autocast():
                 loss = torch.nan_to_num(loss)
-        print(6)
         loss_value = loss.item()
-        print(7)
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
             if args.if_continue_inf:
@@ -82,9 +70,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 continue
             else:
                 sys.exit(1)
-        print(8)
         optimizer.zero_grad()
-        print(9)
         # this attribute is added by timm on one optimizer (adahessian)
         if isinstance(loss_scaler, timm.utils.NativeScaler):
             is_second_order = hasattr(optimizer, 'is_second_order') and optimizer.is_second_order
@@ -95,12 +81,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             if max_norm != None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
             optimizer.step()
-        print(10)
         torch.cuda.synchronize()
-        print(11)
         if model_ema is not None:
             model_ema.update(model)
-        print(12)
         metric_logger.update(loss=loss_value)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
     # gather the stats from all processes
