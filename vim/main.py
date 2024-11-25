@@ -24,6 +24,7 @@ from samplers import RASampler
 from augment import new_data_aug_generator
 
 from contextlib import suppress
+from tqdm.auto import tqdm
 
 import models_mamba
 
@@ -288,7 +289,7 @@ def main(args):
         pin_memory=args.pin_mem,
         drop_last=False
     )
-
+    print(f"Train dataset has {len(dataset_train)} images, val has {len(dataset_val)} images")
     mixup_fn = None
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
     if mixup_active:
@@ -477,7 +478,7 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     max_accuracy = 0.0
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in tqdm(range(args.start_epoch, args.epochs)):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
 
