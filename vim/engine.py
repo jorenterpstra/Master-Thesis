@@ -6,7 +6,6 @@ Train and eval functions used in main.py
 import math
 import sys
 from typing import Iterable, Optional
-from tqdm.auto import tqdm
 
 import torch
 
@@ -34,9 +33,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         
     # debug
     # count = 0
-    for samples, targets in tqdm(
-        metric_logger.log_every(data_loader, print_freq, header)
-        ):
+    for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
         # count += 1
         # if count > 20:
         #     break
