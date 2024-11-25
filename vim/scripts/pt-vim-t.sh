@@ -24,4 +24,4 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
      --data-path /storage/scratch/6403840/data/imagenet \
      --output_dir ./output/vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
      --no_amp \
-     --pin_mem
+     --pin-mem
