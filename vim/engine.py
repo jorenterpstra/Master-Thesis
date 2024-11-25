@@ -37,18 +37,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         # count += 1
         # if count > 20:
         #     break
-        torch.cuda.empty_cache()
-
-        # Print GPU info before transfer
-        gpu_id = torch.cuda.current_device()
-        print(f"GPU {gpu_id} - Memory before transfer: {torch.cuda.memory_allocated(gpu_id)/1024**2:.2f}MB")
-        print(f"Batch info - samples: {samples.shape}, targets: {targets.shape}")
-
+        print("samples.shape: ", samples.shape)
+        print("targets.shape: ", targets.shape)
+        print(f"Data to device {device}")
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
-        
-         # Print GPU info after transfer
-        print(f"GPU {gpu_id} - Memory after transfer: {torch.cuda.memory_allocated(gpu_id)/1024**2:.2f}MB")
+        print(f"Data to device {device} done")
 
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
@@ -59,7 +53,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         if args.bce_loss:
             targets = targets.gt(0.0).type(targets.dtype)
          
-        print("Calculate loss")
         with amp_autocast():
             outputs = model(samples, if_random_cls_token_position=args.if_random_cls_token_position, if_random_token_rank=args.if_random_token_rank)
             # outputs = model(samples)
@@ -77,7 +70,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 loss = torch.nan_to_num(loss)
 
         loss_value = loss.item()
-        print("Loss is: ", loss_value)
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
@@ -88,7 +80,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 sys.exit(1)
 
         optimizer.zero_grad()
-        
+
         # this attribute is added by timm on one optimizer (adahessian)
         if isinstance(loss_scaler, timm.utils.NativeScaler):
             is_second_order = hasattr(optimizer, 'is_second_order') and optimizer.is_second_order
@@ -100,7 +92,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
             optimizer.step()
 
-        print("Synchronize between processes")
         torch.cuda.synchronize()
         if model_ema is not None:
             model_ema.update(model)
