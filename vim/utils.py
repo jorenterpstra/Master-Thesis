@@ -214,8 +214,8 @@ def save_on_master(*args, **kwargs):
 
 
 def init_distributed_mode(args):
-    print(os.environ)
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        print('Using environment variables for distributed configuration')
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
@@ -231,7 +231,6 @@ def init_distributed_mode(args):
         return
 
     args.distributed = True
-    print(args.rank, "\n", args.gpu)
     torch.cuda.set_device(args.gpu)
     args.dist_backend = 'nccl'
     print('| distributed init (rank {}): {}'.format(
