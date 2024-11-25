@@ -37,7 +37,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         # count += 1
         # if count > 20:
         #     break
-
+        print("samples.shape: ", samples.shape)
+        print("targets.shape: ", targets.shape)
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
@@ -77,7 +78,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 sys.exit(1)
 
         optimizer.zero_grad()
-
+        
         # this attribute is added by timm on one optimizer (adahessian)
         if isinstance(loss_scaler, timm.utils.NativeScaler):
             is_second_order = hasattr(optimizer, 'is_second_order') and optimizer.is_second_order
@@ -89,6 +90,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
             optimizer.step()
 
+        print("Synchronize between processes")
         torch.cuda.synchronize()
         if model_ema is not None:
             model_ema.update(model)
