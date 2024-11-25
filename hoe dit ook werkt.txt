@@ -1,0 +1,6 @@
+eerst vim trainen op imagenet en checkpoint opslaan van beste ding
+daarna pretrained vim checkpoint gebruiken om op coco te finetunen via detectron2 gebeuren
+bash file roept alleen dat finetunen aan bij coco, meer niet
+config file nodig, #TODO uitvogelen hoe dat backbone gebeuren werkt want idk 
+    hoe ik de embedding dan moet gaan aan kunnen passen
+beetje vaag dat ze het als 'backbone' gebruiken van een al bestaand algoritme?
