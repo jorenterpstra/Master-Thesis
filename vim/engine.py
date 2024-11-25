@@ -37,10 +37,18 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         # count += 1
         # if count > 20:
         #     break
-        print("samples.shape: ", samples.shape)
-        print("targets.shape: ", targets.shape)
+        torch.cuda.empty_cache()
+
+        # Print GPU info before transfer
+        gpu_id = torch.cuda.current_device()
+        print(f"GPU {gpu_id} - Memory before transfer: {torch.cuda.memory_allocated(gpu_id)/1024**2:.2f}MB")
+        print(f"Batch info - samples: {samples.shape}, targets: {targets.shape}")
+
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
+        
+         # Print GPU info after transfer
+        print(f"GPU {gpu_id} - Memory after transfer: {torch.cuda.memory_allocated(gpu_id)/1024**2:.2f}MB")
 
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
@@ -70,7 +78,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
         loss_value = loss.item()
         print("Loss is: ", loss_value)
-        
+
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
             if args.if_continue_inf:
