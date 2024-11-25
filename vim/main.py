@@ -220,10 +220,10 @@ def get_args_parser():
 
 
 def main(args):
+    print(args)
     utils.init_distributed_mode(args)
 
-    print(args)
-
+    
     if args.distillation_type != 'none' and args.finetune and not args.eval:
         raise NotImplementedError("Finetuning with distillation not yet supported")
 
