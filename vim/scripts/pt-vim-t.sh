@@ -13,7 +13,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun \
     --data-path /storage/scratch/6403840/data/imagenet \
     --output_dir ./output/vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --no_amp \
-    --pin-mem
+    --pin-mem \
+    --mixup 0.0 \
+    --cutmix 0.0 \
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
 #     --batch-size 64 \
