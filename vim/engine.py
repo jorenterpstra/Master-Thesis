@@ -55,6 +55,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
 
         with amp_autocast():
+            print('Model forward pass started')
             outputs = model(samples, if_random_cls_token_position=args.if_random_cls_token_position, if_random_token_rank=args.if_random_token_rank)
             # outputs = model(samples)
             print('Model forward pass done')
