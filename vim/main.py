@@ -372,7 +372,7 @@ def main(args):
         except:
             print('no patch embed')
             
-    model.to(device)
+    model = model.to(device)
 
     model_ema = None
     if args.model_ema:
