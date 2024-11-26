@@ -44,6 +44,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             print('Mixing up samples')
             samples, targets = mixup_fn(samples, targets)
             print('Samples mixed up')
+        print('Waiting for GPU synchronization')
         torch.cuda.synchronize()
         print('GPUs synchronized')
         if args.cosub:
