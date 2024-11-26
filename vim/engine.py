@@ -39,7 +39,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         print('Loading samples')
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
-        print('Samples loaded')
+        print(f'Samples are now loaded on device {samples.device}' )
+        print(f"The target is now loaded on device {targets.device}")
         if mixup_fn is not None:
             print('Mixing up samples')
             samples, targets = mixup_fn(samples, targets)

@@ -371,8 +371,9 @@ def main(args):
                 p.requires_grad = False
         except:
             print('no patch embed')
-            
+    
     model = model.to(device)
+    print(f"The device the model is on: {next(model.parameters()).device}")
 
     model_ema = None
     if args.model_ema:
