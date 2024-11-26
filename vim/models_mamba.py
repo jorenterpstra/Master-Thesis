@@ -543,7 +543,7 @@ class VisionMamba(nn.Module):
             raise NotImplementedError
 
     def forward(self, x, return_features=False, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False):
-        print("Forward pass") # TODO: remove this line
+        print("Forward pass in Vim") # TODO: remove this line
         print("Self is on device: ", self.device) # TODO: remove this line
         print("X is on device: ", x.device) # TODO: remove this line
         x = self.forward_features(x, inference_params, if_random_cls_token_position=if_random_cls_token_position, if_random_token_rank=if_random_token_rank)
