@@ -392,9 +392,8 @@ class VisionMamba(nn.Module):
     def forward_features(self, x, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False):
         # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
         # with slight modifications to add the dist_token
-        print("Forward features in Vim, X is on device: ", x.device) # TODO: remove this line
         x = self.patch_embed(x)
-        print("Patch embed done, X is on device: ", x.device)
+        print("Patch embed done, X is on device: ", x.device) # TODO: remove this line
         B, M, _ = x.shape
         print("B: ", B)
         if self.if_cls_token:
