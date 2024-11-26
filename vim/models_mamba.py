@@ -387,7 +387,7 @@ class VisionMamba(nn.Module):
         # with slight modifications to add the dist_token
         x = self.patch_embed(x)
         B, M, _ = x.shape
-
+        print("x shape: ", x.shape)
         if self.if_cls_token:
             if self.use_double_cls_token:
                 cls_token_head = self.cls_token_head.expand(B, -1, -1)
@@ -544,7 +544,6 @@ class VisionMamba(nn.Module):
 
     def forward(self, x, return_features=False, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False):
         print("Forward pass in Vim") # TODO: remove this line
-        print("Self is on device: ", self.device) # TODO: remove this line
         print("X is on device: ", x.device) # TODO: remove this line
         x = self.forward_features(x, inference_params, if_random_cls_token_position=if_random_cls_token_position, if_random_token_rank=if_random_token_rank)
         if return_features:
