@@ -62,6 +62,7 @@ class PatchEmbed(nn.Module):
         assert H == self.img_size[0] and W == self.img_size[1], \
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
         print("Input image size matches model, projecting to patches")
+        print("Projection layer is on device: ", self.proj.weight.device)
         x = self.proj(x)
         print("Projected to patches, X is on device: ", x.device)
         if self.flatten:
