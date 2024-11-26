@@ -43,14 +43,20 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
         torch.cuda.synchronize()
-
+        print('GPUs synchronized')
         if args.cosub:
             samples = torch.cat((samples,samples),dim=0)
+        print('Samples concatenated')
+
         if args.bce_loss:
             targets = targets.gt(0.0).type(targets.dtype)
+        print('BCE loss applied')
+
+
         with amp_autocast():
             outputs = model(samples, if_random_cls_token_position=args.if_random_cls_token_position, if_random_token_rank=args.if_random_token_rank)
             # outputs = model(samples)
+            print('Model forward pass done')
             if not args.cosub:
                 loss = criterion(samples, outputs, targets)
             else:
@@ -59,11 +65,15 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 loss = loss + 0.25 * criterion(outputs[1], targets) 
                 loss = loss + 0.25 * criterion(outputs[0], outputs[1].detach().sigmoid())
                 loss = loss + 0.25 * criterion(outputs[1], outputs[0].detach().sigmoid()) 
+            print('Loss calculated')
 
         if args.if_nan2num:
             with amp_autocast():
                 loss = torch.nan_to_num(loss)
+            print('Loss nan to num done')
         loss_value = loss.item()
+        print('Loss value calculated = ', loss_value)
+
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
             if args.if_continue_inf:
@@ -71,23 +81,31 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 continue
             else:
                 sys.exit(1)
+
         optimizer.zero_grad()
+        print('Optimizer zero grad done')
+
         # this attribute is added by timm on one optimizer (adahessian)
         if isinstance(loss_scaler, timm.utils.NativeScaler):
             is_second_order = hasattr(optimizer, 'is_second_order') and optimizer.is_second_order
             loss_scaler(loss, optimizer, clip_grad=max_norm,
                     parameters=model.parameters(), create_graph=is_second_order)
+            print('Loss scaled')
         else:
             loss.backward()
             if max_norm != None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
             optimizer.step()
+            print('Optimizer step done')
+        print('Model training done, waiting for GPU synchronization')
         torch.cuda.synchronize()
+        print('GPU synchronized')
         if model_ema is not None:
             model_ema.update(model)
         metric_logger.update(loss=loss_value)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
     # gather the stats from all processes
+    print('Synchronizing between processes')
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
