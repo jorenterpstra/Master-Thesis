@@ -53,12 +53,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             targets = targets.gt(0.0).type(targets.dtype)
         # print('BCE loss applied')
 
-
         with amp_autocast():
-            print('Model forward pass started')
             outputs = model(samples, if_random_cls_token_position=args.if_random_cls_token_position, if_random_token_rank=args.if_random_token_rank)
             # outputs = model(samples)
-            print('Model forward pass done')
+            
             if not args.cosub:
                 loss = criterion(samples, outputs, targets)
             else:
@@ -67,12 +65,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 loss = loss + 0.25 * criterion(outputs[1], targets) 
                 loss = loss + 0.25 * criterion(outputs[0], outputs[1].detach().sigmoid())
                 loss = loss + 0.25 * criterion(outputs[1], outputs[0].detach().sigmoid()) 
-            print('Loss calculated')
 
         if args.if_nan2num:
             with amp_autocast():
                 loss = torch.nan_to_num(loss)
-            print('Loss nan to num done')
         loss_value = loss.item()
         print('Loss value calculated = ', loss_value)
 
