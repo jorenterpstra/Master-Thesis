@@ -242,6 +242,7 @@ def init_distributed_mode(args):
     print('| initialized host {} as rank {}'.format(
         os.getenv('HOSTNAME'), args.rank), flush=True)
     torch.distributed.barrier()
+    print('| barrier ', flush=True)
     setup_for_distributed(args.rank == 0)
     print('| done with init process group', flush=True)
 
