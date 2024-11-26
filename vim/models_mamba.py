@@ -51,8 +51,6 @@ class PatchEmbed(nn.Module):
         
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride)
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
-        if device is not None:
-            self.to(device)
 
 
     def forward(self, x):
@@ -62,7 +60,7 @@ class PatchEmbed(nn.Module):
         assert H == self.img_size[0] and W == self.img_size[1], \
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
         print("Input image size matches model, projecting to patches")
-        print("Projection layer is on device: ", self.proj.weight.device)
+        print("Projection layer is on device: ", self.proj.weight.device, self.proj.bias.device)
         x = self.proj(x)
         print("Projected to patches, X is on device: ", x.device)
         if self.flatten:
