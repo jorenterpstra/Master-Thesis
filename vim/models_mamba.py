@@ -54,13 +54,13 @@ class PatchEmbed(nn.Module):
 
 
     def forward(self, x):
-        print("Patch Embed forward, X is on device: ", x.device) # TODO: remove this line
+        print("---------- Patch Embed forward, X is on device: ", x.device) # TODO: remove this line
         B, C, H, W = x.shape
-        print(f"B: {B}, C: {C}, H: {H}, W: {W}")
+        # print(f"B: {B}, C: {C}, H: {H}, W: {W}")
         assert H == self.img_size[0] and W == self.img_size[1], \
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        print("Input image size matches model, projecting to patches")
-        print("Projection layer is on device: ", self.proj.weight.device, self.proj.bias.device)
+        # print("Input image size matches model, projecting to patches")
+        print("---------- Projection layer is on device: ", self.proj.weight.device, self.proj.bias.device)
         x = self.proj(x)
         print("Projected to patches, X is on device: ", x.device)
         if self.flatten:

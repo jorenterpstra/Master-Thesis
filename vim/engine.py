@@ -36,22 +36,22 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         # count += 1
         # if count > 20:
         #     break
-        print('Loading samples')
+        # print('Loading samples')
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
-        print(f'Samples are now loaded on device {samples.device}' )
-        print(f"The target is now loaded on device {targets.device}")
+        # print(f'Samples are now loaded on device {samples.device}' )
+        # print(f"The target is now loaded on device {targets.device}")
         if mixup_fn is not None:
-            print('Mixing up samples')
+            # print('Mixing up samples')
             samples, targets = mixup_fn(samples, targets)
-            print('Samples mixed up')
+            # print('Samples mixed up')
         if args.cosub:
             samples = torch.cat((samples,samples),dim=0)
-        print('Samples concatenated')
+        # print('Samples concatenated')
 
         if args.bce_loss:
             targets = targets.gt(0.0).type(targets.dtype)
-        print('BCE loss applied')
+        # print('BCE loss applied')
 
 
         with amp_autocast():
