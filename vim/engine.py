@@ -30,13 +30,14 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
     
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
-        
+    print('start training', device)
     # debug
     # count = 0
     for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
         # count += 1
         # if count > 20:
         #     break
+        print('loop started on device ', device)
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
