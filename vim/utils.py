@@ -219,9 +219,6 @@ def init_distributed_mode(args):
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
-        print('args.rank: ', args.rank)
-        print('args.world_size: ', args.world_size)
-        print('args.gpu: ', args.gpu)
     # TODO this is not working, SLURM is not setting the environment variables properly
     # but does work when I only use one GPU
     elif 'SLURM_PROCID' in os.environ:
@@ -242,8 +239,11 @@ def init_distributed_mode(args):
                                          init_method=args.dist_url,
                                          world_size=args.world_size, 
                                          rank=args.rank)
+    print('| initialized host {} as rank {}'.format(
+        os.getenv('HOSTNAME'), args.rank), flush=True)
     torch.distributed.barrier()
     setup_for_distributed(args.rank == 0)
+    print('| done with init process group', flush=True)
 
 
 # if 'pos_embed' in state_dict:
