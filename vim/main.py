@@ -297,6 +297,7 @@ def main(args):
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
     # TODO mixup_fn is not used for testing
     if mixup_active: 
+        print(f"Using Mixup/Cutmix with alpha: {args.mixup}, {args.cutmix}")
         mixup_fn = Mixup(
             mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
             prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
