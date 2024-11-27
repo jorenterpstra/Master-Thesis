@@ -54,11 +54,13 @@ class PatchEmbed(nn.Module):
 
 
     def forward(self, x):
-        print("---------- Patch Embed forward, X is on device: ", x.device) # TODO: remove this line
+        if self.debug:
+            print("---------- Patch Embed forward, X is on device: ", x.device) # TODO: remove this line
         B, C, H, W = x.shape
         assert H == self.img_size[0] and W == self.img_size[1], \
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        # print("---------- Projection layer is on device: ", self.proj.weight.device, self.proj.bias.device)
+        if self.debug:
+            print("---------- Projection layer is on device: ", self.proj.weight.device, self.proj.bias.device)
         x = self.proj(x)
         # print("Projected to patches, X is on device: ", x.device)
         if self.flatten:
@@ -265,6 +267,7 @@ class VisionMamba(nn.Module):
                  init_layer_scale=None,
                  use_double_cls_token=False,
                  use_middle_cls_token=True,
+                 debug=False,
                  **kwargs):
         factory_kwargs = {"device": device, "dtype": dtype}
         # add factory_kwargs into kwargs
@@ -282,6 +285,7 @@ class VisionMamba(nn.Module):
         self.use_double_cls_token = use_double_cls_token
         self.use_middle_cls_token = use_middle_cls_token
         self.num_tokens = 1 if if_cls_token else 0
+        self.debug = debug
 
         # pretrain parameters
         self.num_classes = num_classes
@@ -392,7 +396,6 @@ class VisionMamba(nn.Module):
         # with slight modifications to add the dist_token
         x = self.patch_embed(x)
         B, M, _ = x.shape
-        print("B: ", B)
         if self.if_cls_token:
             if self.use_double_cls_token:
                 cls_token_head = self.cls_token_head.expand(B, -1, -1)
