@@ -230,7 +230,8 @@ def init_distributed_mode(args):
         print('Not using distributed mode')
         args.distributed = False
         return
-    print("GPU ", args.gpu)
+    print(os.environ['MASTER_ADDR'])
+    print(os.environ['MASTER_PORT'])
     args.distributed = True
     torch.cuda.set_device(args.gpu)
     args.dist_backend = 'nccl'
@@ -240,8 +241,6 @@ def init_distributed_mode(args):
                                          init_method=args.dist_url,
                                          world_size=args.world_size, 
                                          rank=args.rank)
-    print('| initialized host {} as rank {}'.format(
-        os.getenv('HOSTNAME'), args.rank), flush=True)
     torch.distributed.barrier()
     print('| barrier ', flush=True)
     #setup_for_distributed(args.rank == 0) 
