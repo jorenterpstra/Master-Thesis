@@ -56,13 +56,11 @@ class PatchEmbed(nn.Module):
     def forward(self, x):
         print("---------- Patch Embed forward, X is on device: ", x.device) # TODO: remove this line
         B, C, H, W = x.shape
-        # print(f"B: {B}, C: {C}, H: {H}, W: {W}")
         assert H == self.img_size[0] and W == self.img_size[1], \
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        # print("Input image size matches model, projecting to patches")
-        print("---------- Projection layer is on device: ", self.proj.weight.device, self.proj.bias.device)
+        # print("---------- Projection layer is on device: ", self.proj.weight.device, self.proj.bias.device)
         x = self.proj(x)
-        print("Projected to patches, X is on device: ", x.device)
+        # print("Projected to patches, X is on device: ", x.device)
         if self.flatten:
             x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
         x = self.norm(x)
@@ -393,7 +391,6 @@ class VisionMamba(nn.Module):
         # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
         # with slight modifications to add the dist_token
         x = self.patch_embed(x)
-        print("Patch embed done, X is on device: ", x.device) # TODO: remove this line
         B, M, _ = x.shape
         print("B: ", B)
         if self.if_cls_token:
@@ -551,7 +548,6 @@ class VisionMamba(nn.Module):
             raise NotImplementedError
 
     def forward(self, x, return_features=False, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False):
-        print("Forward pass in Vim, X is on device: ", x.device) # TODO: remove this line
         x = self.forward_features(x, inference_params, if_random_cls_token_position=if_random_cls_token_position, if_random_token_rank=if_random_token_rank)
         if return_features:
             return x

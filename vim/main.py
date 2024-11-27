@@ -217,6 +217,8 @@ def get_args_parser():
     parser.set_defaults(if_random_token_rank=False)
 
     parser.add_argument('--local-rank', default=0, type=int)
+    parser.add_argument('--debug', action='store_true', help='debug mode')
+    parser.set_defaults(debug=False)
     return parser
 
 
@@ -297,7 +299,8 @@ def main(args):
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
     # TODO mixup_fn is not used for testing
     if mixup_active: 
-        print(f"Using Mixup/Cutmix with alpha: {args.mixup}, {args.cutmix}")
+        if args.debug:
+            print(f"Using Mixup/Cutmix with alpha: {args.mixup}, {args.cutmix}")
         mixup_fn = Mixup(
             mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
             prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
@@ -374,8 +377,9 @@ def main(args):
             print('no patch embed')
     
     model.to(device)
-    print(f"------------- The model is being loaded to device {device}")
-    print(f"------------- The device the model is on: {next(model.parameters()).device}")
+    if args.debug:
+        print(f"------------- The model is being loaded to device {device}")
+        print(f"------------- The device the model is on: {next(model.parameters()).device}")
 
     model_ema = None
     if args.model_ema:
@@ -388,10 +392,10 @@ def main(args):
 
     model_without_ddp = model
     if args.distributed:
-        print('Using DistributedDataParallel')
+        if args.debug:
+            print('Using DistributedDataParallel')
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
-        print(f"Done with ")
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
 

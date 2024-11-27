@@ -215,23 +215,25 @@ def save_on_master(*args, **kwargs):
 
 def init_distributed_mode(args):
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-        print('Using environment variables for distributed configuration')
+        if args.debug:
+            print('Using environment variables for distributed configuration')
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
-        print(f"Rank: {args.rank}, World size: {args.world_size}, GPU: {args.gpu}")
+        if args.debug:
+            print(f"Rank: {args.rank}, World size: {args.world_size}, GPU: {args.gpu}")
     # TODO this is not working, SLURM is not setting the environment variables properly
     # but does work when I only use one GPU
     elif 'SLURM_PROCID' in os.environ:
-        print('Using SLURM')
+        if args.debug:
+            print('Using SLURM')
         args.rank = int(os.environ['SLURM_PROCID'])
         args.gpu = args.rank % torch.cuda.device_count()
     else:
-        print('Not using distributed mode')
+        if args.debug:
+            print('Not using distributed mode')
         args.distributed = False
         return
-    print(os.environ['MASTER_ADDR'])
-    print(os.environ['MASTER_PORT'])
     args.distributed = True
     torch.cuda.set_device(args.gpu)
     args.dist_backend = 'nccl'
@@ -242,9 +244,11 @@ def init_distributed_mode(args):
                                          world_size=args.world_size, 
                                          rank=args.rank)
     torch.distributed.barrier()
-    print('| barrier ', flush=True)
+    if args.debug:
+        print('| barrier ', flush=True)
     #setup_for_distributed(args.rank == 0) 
-    print('| done with init process group', flush=True)
+    if args.debug:
+        print('| done with init process group', flush=True)
 
 
 # if 'pos_embed' in state_dict:
