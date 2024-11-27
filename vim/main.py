@@ -374,8 +374,8 @@ def main(args):
             print('no patch embed')
     
     model = model.to(device)
-    print(device)
-    print(f"The device the model is on: {next(model.parameters()).device}")
+    print(f"------------- The model is being loaded to device {device}")
+    print(f"------------- The device the model is on: {next(model.parameters()).device}")
 
     model_ema = None
     if args.model_ema:
