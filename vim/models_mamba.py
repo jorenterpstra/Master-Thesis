@@ -39,7 +39,7 @@ __all__ = [
 class PatchEmbed(nn.Module):
     """ 2D Image to Patch Embedding
     """
-    def __init__(self, img_size=224, patch_size=16, stride=16, in_chans=3, embed_dim=768, norm_layer=None, flatten=True, device=None):
+    def __init__(self, img_size=224, patch_size=16, stride=16, in_chans=3, embed_dim=768, norm_layer=None, flatten=True, debug=False):
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
@@ -48,6 +48,7 @@ class PatchEmbed(nn.Module):
         self.grid_size = ((img_size[0] - patch_size[0]) // stride + 1, (img_size[1] - patch_size[1]) // stride + 1)
         self.num_patches = self.grid_size[0] * self.grid_size[1]
         self.flatten = flatten
+        self.debug = debug
         
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride)
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
@@ -293,7 +294,7 @@ class VisionMamba(nn.Module):
 
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, stride=stride, 
-            in_chans=channels, embed_dim=embed_dim, device=device)
+            in_chans=channels, embed_dim=embed_dim, debug=debug)
         num_patches = self.patch_embed.num_patches
 
         if if_cls_token:
