@@ -4,7 +4,7 @@
 
 CUDA_VISIBLE_DEVICES=2,3 torchrun \
     --nproc_per_node=2 \
-    --rdzv_endpoint localhost:0  \
+    --rdzv_backend c10d   \
     main.py \
     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 64 \
