@@ -234,6 +234,8 @@ def init_distributed_mode(args):
             print('Not using distributed mode')
         args.distributed = False
         return
+    
+    os.environ['MASTER_PORT'] = '12355'
     args.distributed = True
     torch.cuda.set_device(args.gpu)
     args.dist_backend = 'nccl'
