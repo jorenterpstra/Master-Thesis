@@ -4,3 +4,26 @@ bash file roept alleen dat finetunen aan bij coco, meer niet
 config file nodig, #TODO uitvogelen hoe dat backbone gebeuren werkt want idk 
     hoe ik de embedding dan moet gaan aan kunnen passen
 beetje vaag dat ze het als 'backbone' gebruiken van een al bestaand algoritme?
+
+Loss kan op score, dan hoeft het model niet naar volgorde te kijken maar alleen naar score
+Je moet uit een patch een manier halen om 'belangrijkheid' te bepalen, 
+we weten waar alle objecten staan dus we weten ipc hoe belangrijk iedere patch iets
+
+'ranking loss' bestaat ook
+
+weights downloaden van pt-vim-t en ff testen, dan finetunen op de 10& dataset, want kijken of het dan gaat overfitten
+als het overfit niks aan de hand, zo niet gaat er nog iets mis met m'n code
+
+ik kan ook zo'n patch importance model trainen, dan per plaatje volgorde bepalen, 
+en dat dan inladen terwijl je traint.
+
+# CODE CHECKEN
+1. pt-vim-t weights downloaden en op de server krijgen
+2. testen op validation set
+3. training loss en accuracy toevoegen aan training loop
+4. finetunen op 10% dataset
+    a. als hij overfit, niks aan de hand
+    b. als hij beter wordt, huilen
+
+# 
+5. als bij vorig punt a., custom order erin stoppen

@@ -36,6 +36,7 @@ class PatchEmbedCustom(nn.Module):
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
         self.embed_dim = embed_dim
 
+
     def forward(self, x):
         B, C, H, W = x.shape
         assert H == self.img_size[0] and W == self.img_size[1], \

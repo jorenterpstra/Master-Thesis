@@ -2,25 +2,24 @@
 #conda activate vim;
 #cd Master_thesis/vim;
 
-CUDA_VISIBLE_DEVICES=2,3 torchrun \
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun \
     --nnodes=1 \
-    --nproc-per-node=2 \
+    --nproc-per-node=4\
     --max-restarts=3 \
-    --rdzv-backend=c10d \
-    --rdzv-endpoint=localhost:25901 \
     main.py \
-    --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
-    --batch-size 64 \
+    --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2_subset \
+    --batch-size 128 \
     --drop-path 0.0 \
     --weight-decay 0.1 \
-    --num_workers 16 \
+    --num_workers 32 \
     --data-path /storage/scratch/6403840/data/imagenet_subset \
-    --output_dir ./output/vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
+    --output_dir ./output/vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2_subset \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
     --cutmix 0.0 \
     --debug
+    
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
 #     --batch-size 64 \
