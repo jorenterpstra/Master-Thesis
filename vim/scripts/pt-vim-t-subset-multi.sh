@@ -7,7 +7,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun \
     --nproc-per-node=4\
     --max-restarts=3 \
     main.py \
-    --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2_subset \
+    --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 128 \
     --drop-path 0.0 \
     --weight-decay 0.1 \
@@ -19,7 +19,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun \
     --mixup 0.0 \
     --cutmix 0.0 \
     --debug
-    
+
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
 #     --batch-size 64 \
