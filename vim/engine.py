@@ -28,6 +28,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
     
+    
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
     # debug
