@@ -103,10 +103,11 @@ export CUDA_HOME=/usr/local/cuda
 ```bash
 pip install causal_conv1d>=1.1.0
 ```
-直接安装pip install causal_conv1d==1.1.3
-*Directly install pip install causal_conv1d==1.1.3*
-causal_conv1d-1.1.3+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl文件
-*causal_conv1d-1.1.3+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl file*
+直接安装 `pip install causal_conv1d==1.1.3`
+*Directly install `pip install causal_conv1d==1.1.3`*
+
+`causal_conv1d-1.1.3+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl` 文件
+*`causal_conv1d-1.1.3+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl` file*
 
 ### 9. 安装 `mamba-ssm`
 *9. Install `mamba-ssm`*
