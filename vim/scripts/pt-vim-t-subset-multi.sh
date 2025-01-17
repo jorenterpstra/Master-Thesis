@@ -2,7 +2,7 @@
 #conda activate vim;
 #cd Master_thesis/vim;
 
-CUDA_VISIBLE_DEVICES=1,2,3 torchrun \
+CUDA_VISIBLE_DEVICES=2,3 torchrun \
     --nnodes=1 \
     --nproc-per-node=4\
     --max-restarts=3 \
