@@ -7,6 +7,7 @@ from datetime import datetime
 from utils import AverageMeter, LossTracker, visualize_predictions
 import json
 import torch.autograd
+import sys
 
 class PatchScoreLoss(nn.Module):
     """Custom loss for patch score prediction"""
@@ -138,15 +139,23 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch, config
         'rmse': AverageMeter()
     }
     
-    iterator = train_loader
+    # Configure progress bar for SLURM output
     if config.verbose >= 1:
-        iterator = tqdm(train_loader, desc=f'Epoch {epoch} [TRAIN]')
+        iterator = tqdm(train_loader, 
+                       desc=f'Epoch {epoch} [TRAIN]',
+                       ncols=80,  # Fixed width for SLURM files
+                       ascii=True,  # Use simple ASCII characters
+                       mininterval=60.0,  # Update only every minute
+                       file=sys.stdout,
+                       leave=True)  # Keep progress lines
+    else:
+        iterator = train_loader
     
     for images, targets in iterator:
         images = images.to(device)
         targets = targets.to(device)
         
-        print_gpu_info()
+        # print_gpu_info()
         outputs = model(images)
         loss = criterion(outputs, targets)
         
@@ -182,7 +191,17 @@ def validate(model, val_loader, criterion, device, config):
         'rmse': AverageMeter()
     }
     
-    pbar = tqdm(val_loader, desc='[VAL]') if config.verbose >= 1 else val_loader
+    # Configure progress bar for SLURM output
+    if config.verbose >= 1:
+        pbar = tqdm(val_loader, 
+                   desc='[VAL]',
+                   ncols=80,  # Fixed width for SLURM files
+                   ascii=True,  # Use simple ASCII characters
+                   mininterval=60.0,  # Update only every minute
+                   file=sys.stdout,
+                   leave=True)
+    else:
+        pbar = val_loader
     
     for images, targets in pbar:
         images = images.to(device)
@@ -262,10 +281,23 @@ def train_model(model, train_loader, val_loader, config=None):
     best_val_loss = float('inf')
     
     for epoch in range(config.num_epochs):
+        # Clear line and print epoch header
+        print("\n" + "="*80)
+        print(f"Epoch {epoch}/{config.num_epochs-1}")
+        print("-"*80)
+        
         # Train and validate
         train_metrics = train_epoch(model, train_loader, criterion, optimizer, 
                                   config.device, epoch, config)
         val_metrics = validate(model, val_loader, criterion, config.device, config)
+        
+        # Print clear epoch summary
+        print("\nEpoch Summary:")
+        print("-"*40)
+        for metric in train_metrics.keys():
+            print(f"{metric.upper():>8} - Train: {train_metrics[metric]:.4f}, Val: {val_metrics[metric]:.4f}")
+        print(f"Learning rate: {optimizer.param_groups[0]['lr']:.2e}")
+        print("="*80 + "\n")
         
         # Update tracking and scheduler if it exists
         tracker.update(epoch, train_metrics, val_metrics)

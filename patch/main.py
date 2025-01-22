@@ -47,7 +47,7 @@ def main():
     # Setup device - will automatically use the GPU specified by CUDA_VISIBLE_DEVICES
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
-    print_gpu_info()
+    #print_gpu_info()
     
     # Data loading
     print("\nSetting up data loaders...")
