@@ -307,9 +307,9 @@ def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4,
         images = torch.stack([item[0] for item in batch])
         scores = torch.stack([item[1] for item in batch])
         
-        print(f"\nBatch collation:")
-        print(f"Images shape: {images.shape}")
-        print(f"Scores shape: {scores.shape}")
+        # print(f"\nBatch collation:")
+        # print(f"Images shape: {images.shape}")
+        # print(f"Scores shape: {scores.shape}")
         
         return images, scores
     
