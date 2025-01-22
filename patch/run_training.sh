@@ -1,5 +1,22 @@
 #!/bin/bash
+#SBATCH --job-name=patch_scorer
+#SBATCH --output=logs/%j_out.log    # %j is replaced by the job ID
+#SBATCH --error=logs/%j_err.log     # Separate file for errors
+#SBATCH --time=24:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32GB
+#SBATCH --partition=gpu    # Specify the GPU partition
 
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Print some information about the job
+echo "Job ID: $SLURM_JOB_ID"
+echo "Node: $SLURMD_NODENAME"
+echo "Start time: $(date)"
 
 # Load required modules (adjust according to your system)
 module load cuda/11.7
@@ -17,3 +34,6 @@ python main.py \
     --epochs 50 \
     --lr 0.001 \
     --plot-every 5
+
+# Print completion time
+echo "End time: $(date)"
