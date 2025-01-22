@@ -7,7 +7,7 @@
 #SBATCH --mem=16GB
 
 # Create logs directory if it doesn't exist
-mkdir -p logs
+mkdir -p /scratch/6403840/Master-Thesis/patch/logs/
 
 # Print some information about the job
 echo "Job ID: $SLURM_JOB_ID"
@@ -15,8 +15,8 @@ echo "Node: $SLURMD_NODENAME"
 echo "Start time: $(date)"
 
 # Load required modules (adjust according to your system)
-module load cuda/11.7
-module load python/3.9
+module load cuda/11.8
+module load python/3.10
 
 # Activate virtual environment if needed
 # source /path/to/your/venv/bin/activate
