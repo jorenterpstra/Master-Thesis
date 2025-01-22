@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=patch_scorer
-#SBATCH --time=5-00:00:00
+#SBATCH --time=10-00:00:00
 
 # Get least used GPU before loading any CUDA modules but print how much memory is used for all GPUs
 GPU_ID=$(nvidia-smi --query-gpu=memory.used,index --format=csv,noheader,nounits | \
@@ -32,7 +32,7 @@ nvidia-smi -i $GPU_ID
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
     --save-root /scratch/6403840/Master-Thesis/patch/runs/imagenet_training \
-    --batch-size 256 \
+    --batch-size 128 \
     --num-workers 8 \
     --epochs 100 \
     --lr 0.001 \
