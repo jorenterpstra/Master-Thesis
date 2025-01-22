@@ -19,7 +19,7 @@ python main.py \
     --save-root /scratch/6403840/Master-Thesis/patch/runs/imagenet_training \
     --batch-size 32 \
     --num-workers 8 \
-    --epochs 50 \
+    --epochs 100 \
     --lr 0.001 \
     --plot-every 5
 
