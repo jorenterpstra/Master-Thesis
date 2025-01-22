@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-from patch_rank import generate_scores
+from patch.dataloader import generate_scores
 
 def visualize_patch_calculation(image_size=224, patch_size=16, bboxes=None):
     """

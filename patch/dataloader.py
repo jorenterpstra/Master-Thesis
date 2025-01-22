@@ -110,7 +110,7 @@ def generate_scores(image_size, bboxes, patch_size=16):
     return scores.reshape(-1)
 
 class ImageNetPatchRankLoader(torch.utils.data.Dataset):
-    def __init__(self, root_dir, split='train', transform=None):
+    def __init__(self, root_dir, split='train', transform=None, verbose=0):
         """
         Args:
             root_dir: Path to ImageNet dataset
@@ -120,6 +120,7 @@ class ImageNetPatchRankLoader(torch.utils.data.Dataset):
         self.root_dir = Path(root_dir)
         self.split = split
         self.transform = transform
+        self.verbose = verbose
         
         # Setup paths
         self.image_dir = self.root_dir / split
@@ -227,12 +228,16 @@ class ImageNetPatchRankLoader(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         img_path = self.image_paths[idx]
         bbox_path = self.bbox_paths[idx]
+        if self.verbose > 1:
+            print(f"\nLoading item {idx}")
+            print(f"Image path: {img_path}")
+            print(f"Bbox path: {bbox_path}")
         
         # Load image and original bboxes
         image = Image.open(img_path).convert('RGB')
         orig_size = image.size
-        bboxes = self.parse_bbox(bbox_path, orig_size)  # Pass both dimensions
         
+        bboxes = self.parse_bbox(bbox_path, orig_size)
         if bboxes is None:
             bboxes = [[0, 0, orig_size[0], orig_size[1]]]
         
@@ -261,11 +266,11 @@ class ImageNetPatchRankLoader(torch.utils.data.Dataset):
             image = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                       std=[0.229, 0.224, 0.225])(image)
             
-            return image, scores, transformed_bboxes
+            return image, scores
         
         # If no transform, use original dimensions
         scores = generate_scores(min(orig_size), bboxes)
-        return image, scores, bboxes
+        return image, scores
 
 def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4):
     """
@@ -297,13 +302,92 @@ def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4)
         transform=transform
     )
     
-    # Note: scores might have different dimensions based on original image sizes
+    def custom_collate(batch):
+        """Custom collate function to handle variable-sized tensors"""
+        images = torch.stack([item[0] for item in batch])
+        scores = torch.stack([item[1] for item in batch])
+        
+        print(f"\nBatch collation:")
+        print(f"Images shape: {images.shape}")
+        print(f"Scores shape: {scores.shape}")
+        
+        return images, scores
+    
     loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=(split == 'train'),
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=True,
+        collate_fn=custom_collate
     )
     
     return loader
+
+def test_dataloader_shapes(root_dir, batch_size=4):
+    """Test if dataloader returns consistent shapes across batches"""
+    print("\nTesting dataloader batch shapes...")
+    
+    # Create small test loader
+    loader = get_patch_rank_loader(
+        root_dir, 
+        split='train', 
+        batch_size=batch_size, 
+        num_workers=0
+    )
+    
+    batch_shapes = []
+    try:
+        for i, (images, scores) in enumerate(loader):
+                
+            batch_info = {
+                'batch': i,
+                'images': images.shape,
+                'scores': scores.shape,
+            }
+            batch_shapes.append(batch_info)
+            
+            print(f"\nBatch {i}:")
+            print(f"- Images shape: {batch_info['images']}")
+            print(f"- Scores shape: {batch_info['scores']}")
+            
+            # Verify shapes within batch
+            B = images.shape[0]  # Batch size
+            assert images.shape == (B, 3, 224, 224), f"Unexpected image shape: {images.shape}"
+            assert scores.shape == (B, 196), f"Unexpected scores shape: {scores.shape}"
+            
+    except Exception as e:
+        print(f"\nError during batch loading: {str(e)}")
+        print("Last successful batch shapes:")
+        for batch in batch_shapes:
+            print(f"Batch {batch['batch']}:")
+            print(f"- Images: {batch['images']}")
+            print(f"- Scores: {batch['scores']}")
+        raise
+    
+    print("\nAll batches processed successfully!")
+    return batch_shapes
+
+if __name__ == "__main__":
+    data_root = Path("C:/Users/joren/Documents/_Uni/Master/Thesis/imagenet_subset")
+    
+    print("Testing dataloader consistency...")
+    batch_shapes = test_dataloader_shapes(data_root)
+    
+    # Additional analysis of results
+    print("\nShape consistency summary:")
+    reference = batch_shapes[0]
+    all_consistent = True
+    
+    for i, batch in enumerate(batch_shapes[1:], 1):
+        if (batch['images'] != reference['images'] or 
+            batch['scores'] != reference['scores']):
+            print(f"Inconsistency in batch {i}:")
+            print(f"Expected: {reference}")
+            print(f"Got: {batch}")
+            all_consistent = False
+    
+    if all_consistent:
+        print("✓ All batch shapes are consistent!")
+    else:
+        print("✗ Found shape inconsistencies!")

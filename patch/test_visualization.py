@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
-from patch_rank import ImageNetPatchRankLoader
+from patch.dataloader import ImageNetPatchRankLoader
 import torchvision.transforms as transforms
 from PIL import Image, ImageDraw
 import torch
