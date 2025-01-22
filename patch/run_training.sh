@@ -1,13 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=patch_scorer
-#SBATCH --output=/scratch/6403840/Master-Thesis/patch/logs/%j_out.log    # %j is replaced by the job ID
-#SBATCH --error=/scratch/6403840/Master-Thesis/patch/logs/%j_err.log     # Separate file for errors
 #SBATCH --time=10:00:00
-#SBATCH --nodes=1
-#SBATCH --mem=16GB
-
-# Create logs directory if it doesn't exist
-mkdir -p /scratch/6403840/Master-Thesis/patch/logs/
 
 # Print some information about the job
 echo "Job ID: $SLURM_JOB_ID"
