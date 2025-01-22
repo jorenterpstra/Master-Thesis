@@ -1,3 +1,7 @@
+import os
+# Verify CUDA setup before importing torch
+print(f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES', 'Not Set')}")
+
 import torch
 from pathlib import Path
 from models import PatchEmbeddingScorer
@@ -29,9 +33,9 @@ def parse_args():
 def print_gpu_info():
     """Print GPU information and memory usage"""
     if torch.cuda.is_available():
-        gpu_id = int(os.environ.get('CUDA_VISIBLE_DEVICES', 0))
+        # Now we use device 0 because CUDA_VISIBLE_DEVICES makes our selected GPU appear as device 0
+        print(f"Number of available GPUs: {torch.cuda.device_count()}")
         print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-        print(f"GPU ID: {gpu_id}")
         print(f"Memory Usage:")
         print(f"Allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f}MB")
         print(f"Cached: {torch.cuda.memory_reserved(0) / 1024**2:.2f}MB")
@@ -39,7 +43,7 @@ def print_gpu_info():
 def main():
     args = parse_args()
     
-    # Setup device and print GPU info
+    # Setup device - will automatically use the GPU specified by CUDA_VISIBLE_DEVICES
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     print_gpu_info()
