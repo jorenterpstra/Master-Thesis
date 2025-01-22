@@ -2,6 +2,11 @@
 #SBATCH --job-name=patch_scorer
 #SBATCH --time=5-00:00:00
 
+# Load modules
+module load cuda/11.8
+source ~/.bashrc
+conda activate vim
+
 # Print job information
 echo "Job ID: $SLURM_JOB_ID"
 echo "Node: $SLURMD_NODENAME"
@@ -23,14 +28,12 @@ echo "Selected GPU $GPU_ID with lowest memory usage"
 # Set CUDA device
 export CUDA_VISIBLE_DEVICES=$GPU_ID
 
-# Load modules
-module load cuda/11.8
 
 # Run the training script with GPU info
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
     --save-root /scratch/6403840/Master-Thesis/patch/runs/imagenet_training \
-    --batch-size 128 \
+    --batch-size 64 \
     --num-workers 8 \
     --epochs 100 \
     --lr 0.001 \
