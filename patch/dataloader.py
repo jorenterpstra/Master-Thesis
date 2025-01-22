@@ -272,7 +272,7 @@ class ImageNetPatchRankLoader(torch.utils.data.Dataset):
         scores = generate_scores(min(orig_size), bboxes)
         return image, scores
 
-def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4):
+def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4, **kwargs):
     """
     Create a DataLoader for the ImageNetPatchRank dataset
     The transforms are only applied to the input image, not for score calculation
@@ -299,7 +299,7 @@ def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4)
     dataset = ImageNetPatchRankLoader(
         root_dir=root_dir,
         split=split,
-        transform=transform
+        transform=transform,
     )
     
     def custom_collate(batch):
@@ -319,7 +319,8 @@ def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4)
         shuffle=(split == 'train'),
         num_workers=num_workers,
         pin_memory=True,
-        collate_fn=custom_collate
+        collate_fn=custom_collate,
+        **kwargs
     )
     
     return loader
