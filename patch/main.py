@@ -7,7 +7,6 @@ from pathlib import Path
 from models import PatchEmbeddingScorer
 from training_loop import TrainingConfig, train_model
 from dataloader import get_patch_rank_loader
-from torch.utils.data import random_split
 import json
 import argparse
 import os

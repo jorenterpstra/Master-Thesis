@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
-from main import print_gpu_info
 from pathlib import Path
-import numpy as np
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 from torch.nn import functional as F
 from datetime import datetime
 from utils import AverageMeter, LossTracker, visualize_predictions
@@ -121,6 +118,17 @@ class TrainingConfig:
         
         with open(self.save_dir / 'config.json', 'w') as f:
             json.dump(config, f, indent=2)
+
+def print_gpu_info():
+    """Print GPU information and memory usage"""
+    if torch.cuda.is_available():
+        # we want to print the available GPUs and which one we are using
+        print(f"Number of available GPUs: {torch.cuda.device_count()}")
+        print(f"Using GPU: {torch.cuda.get_device_name()}")
+        print(f"Using device: {torch.cuda.current_device()}")
+        print(f"Memory Usage:")
+        print(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB")
+        print(f"Cached: {torch.cuda.memory_reserved() / 1024**2:.2f}MB")
 
 def train_epoch(model, train_loader, criterion, optimizer, device, epoch, config):
     model.train()
