@@ -319,8 +319,7 @@ def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4,
         shuffle=(split == 'train'),
         num_workers=num_workers,
         pin_memory=True,
-        collate_fn=custom_collate,
-        **kwargs
+        collate_fn=custom_collate
     )
     
     return loader
