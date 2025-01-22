@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from main import print_gpu_info
 from pathlib import Path
 import numpy as np
 from tqdm import tqdm
@@ -137,6 +137,7 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch, config
         images = images.to(device)
         targets = targets.to(device)
         
+        print_gpu_info()
         outputs = model(images)
         loss = criterion(outputs, targets)
         
