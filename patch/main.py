@@ -102,6 +102,7 @@ def main():
     )
     
     # Train model
+    print_gpu_info()
     print("\nStarting training...")
     tracker = train_model(model, train_loader, val_loader, config)
     
