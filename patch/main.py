@@ -5,11 +5,32 @@ from training_loop import TrainingConfig, train_model
 from dataloader import get_patch_rank_loader
 from torch.utils.data import random_split
 import json
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train patch scoring model')
+    parser.add_argument('--data-root', type=str, default='/scratch/6403840/data/imagenet',
+                        help='Path to ImageNet dataset')
+    parser.add_argument('--save-root', type=str, default='runs/imagenet_training',
+                        help='Path to save results')
+    parser.add_argument('--batch-size', type=int, default=32,
+                        help='Batch size for training')
+    parser.add_argument('--num-workers', type=int, default=8,
+                        help='Number of data loading workers')
+    parser.add_argument('--epochs', type=int, default=50,
+                        help='Number of epochs to train')
+    parser.add_argument('--lr', type=float, default=0.001,
+                        help='Initial learning rate')
+    parser.add_argument('--plot-every', type=int, default=5,
+                        help='Plot predictions every N epochs')
+    return parser.parse_args()
 
 def main():
+    args = parse_args()
+    
     # Setup paths
-    data_root = Path("/scratch/6403840/data/imagenet")
-    save_root = Path("runs/imagenet_training")
+    data_root = Path(args.data_root)
+    save_root = Path(args.save_root)
     
     # Setup device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -20,16 +41,16 @@ def main():
     train_loader = get_patch_rank_loader(
         data_root, 
         split='train',
-        batch_size=32,
-        num_workers=8,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
         shuffle=True
     )
     
     val_loader = get_patch_rank_loader(
         data_root, 
         split='val',
-        batch_size=32,
-        num_workers=8
+        batch_size=args.batch_size,
+        num_workers=args.num_workers
     )
     
     print(f"Dataset sizes - Train: {len(train_loader.dataset)}, Val: {len(val_loader.dataset)}")
@@ -45,20 +66,20 @@ def main():
     config = TrainingConfig(
         verbose=2,              # Show detailed progress
         save_dir=save_root,
-        plot_every=5,          # Visualize every 5 epochs
+        plot_every=args.plot_every,          # Visualize every 5 epochs
         save_best=True,
-        num_epochs=50,         # Train for 50 epochs
-        batch_size=32,
-        num_workers=8,
+        num_epochs=args.epochs,         # Train for 50 epochs
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
         optimizer={
             'name': 'sgd',
-            'lr': 0.001,       # Initial learning rate
+            'lr': args.lr,       # Initial learning rate
             'momentum': 0.9,
             'weight_decay': 1e-4
         },
         scheduler={
             'name': 'cosine',
-            'T_max': 50,       # Match with num_epochs
+            'T_max': args.epochs,       # Match with num_epochs
             'eta_min': 1e-6    # Minimum learning rate
         },
         loss={
