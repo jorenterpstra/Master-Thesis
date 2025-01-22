@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=patch_scorer
 #SBATCH --time=5-00:00:00
-#SBATCH --mem-per-gpu=6G
 
 # Get least used GPU before loading any CUDA modules
 GPU_ID=$(nvidia-smi --query-gpu=memory.used,index --format=csv,noheader,nounits | \

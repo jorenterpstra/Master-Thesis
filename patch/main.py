@@ -35,10 +35,10 @@ def print_gpu_info():
     if torch.cuda.is_available():
         # Now we use device 0 because CUDA_VISIBLE_DEVICES makes our selected GPU appear as device 0
         print(f"Number of available GPUs: {torch.cuda.device_count()}")
-        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+        print(f"Using GPU: {torch.cuda.get_device_name()}")
         print(f"Memory Usage:")
-        print(f"Allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f}MB")
-        print(f"Cached: {torch.cuda.memory_reserved(0) / 1024**2:.2f}MB")
+        print(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB")
+        print(f"Cached: {torch.cuda.memory_reserved() / 1024**2:.2f}MB")
 
 def main():
     args = parse_args()
