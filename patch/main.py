@@ -73,7 +73,7 @@ def main():
     # Training configuration
     config = TrainingConfig(
         verbose=2,              # Show detailed progress
-        save_dir=save_root,
+        save_dir=args.save_root,
         plot_every=args.plot_every,          # Visualize every 5 epochs
         save_best=True,
         num_epochs=args.epochs,         # Train for 50 epochs
