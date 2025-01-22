@@ -143,9 +143,9 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch, config
     if config.verbose >= 1:
         iterator = tqdm(train_loader, 
                        desc=f'Epoch {epoch} [TRAIN]',
-                       ncols=80,  # Fixed width for SLURM files
+                       ncols=100,  # Fixed width for SLURM files
                        ascii=True,  # Use simple ASCII characters
-                       mininterval=60.0,  # Update only every minute
+                       mininterval=10.0,  # Update only every minute
                        file=sys.stdout,
                        leave=True)  # Keep progress lines
     else:
@@ -195,9 +195,9 @@ def validate(model, val_loader, criterion, device, config):
     if config.verbose >= 1:
         pbar = tqdm(val_loader, 
                    desc='[VAL]',
-                   ncols=80,  # Fixed width for SLURM files
+                   ncols=100,  # Fixed width for SLURM files
                    ascii=True,  # Use simple ASCII characters
-                   mininterval=60.0,  # Update only every minute
+                   mininterval=10.0,  # Update only every minute
                    file=sys.stdout,
                    leave=True)
     else:
