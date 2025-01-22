@@ -1,8 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=patch_scorer
 #SBATCH --time=5-00:00:00
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32GB
+#SBATCH --mem-per-gpu=6G
 
 # Get least used GPU before loading any CUDA modules
 GPU_ID=$(nvidia-smi --query-gpu=memory.used,index --format=csv,noheader,nounits | \
@@ -23,10 +22,6 @@ conda activate vim
 echo "Job ID: $SLURM_JOB_ID"
 echo "Node: $SLURMD_NODENAME"
 echo "Start time: $(date)"
-
-# Show GPU info
-echo "Using GPU:"
-nvidia-smi -i $GPU_ID
 
 # Run the training script with GPU info
 python main.py \
