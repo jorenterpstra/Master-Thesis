@@ -9,7 +9,6 @@ echo "Start time: $(date)"
 
 # Load required modules (adjust according to your system)
 module load cuda/11.8
-module load python/3.10
 
 # Activate virtual environment if needed
 # source /path/to/your/venv/bin/activate
