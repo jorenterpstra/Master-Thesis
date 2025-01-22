@@ -30,7 +30,7 @@ module load cuda/11.8
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
     --save-root /scratch/6403840/Master-Thesis/patch/runs/imagenet_training \
-    --batch-size 256 \
+    --batch-size 128 \
     --num-workers 8 \
     --epochs 100 \
     --lr 0.001 \
