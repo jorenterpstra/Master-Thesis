@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=patch_scorer
-#SBATCH --output=logs/%j_out.log    # %j is replaced by the job ID
-#SBATCH --error=logs/%j_err.log     # Separate file for errors
+#SBATCH --output=/scratch/6403840/Master-Thesis/patch/logs/%j_out.log    # %j is replaced by the job ID
+#SBATCH --error=/scratch/6403840/Master-Thesis/patch/logs/%j_err.log     # Separate file for errors
 #SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=16GB
@@ -24,7 +24,7 @@ module load python/3.9
 # Run the training script
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
-    --save-root runs/imagenet_training \
+    --save-root /scratch/6403840/Master-Thesis/patch/runs/imagenet_training \
     --batch-size 32 \
     --num-workers 8 \
     --epochs 50 \
