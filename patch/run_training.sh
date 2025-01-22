@@ -33,7 +33,7 @@ export CUDA_VISIBLE_DEVICES=$GPU_ID
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
     --save-root /scratch/6403840/Master-Thesis/patch/runs/imagenet_training \
-    --batch-size 64 \
+    --batch-size 256 \
     --num-workers 8 \
     --epochs 100 \
     --lr 0.001 \
