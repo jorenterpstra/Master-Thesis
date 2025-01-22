@@ -39,6 +39,7 @@ def print_gpu_info():
         print(f"Memory Usage:")
         print(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB")
         print(f"Cached: {torch.cuda.memory_reserved() / 1024**2:.2f}MB")
+        print(torch.cuda.memory_summary(device=None, abbreviated=False))
 
 def main():
     args = parse_args()
