@@ -47,7 +47,7 @@ def main():
     # Data loading
     print("\nSetting up data loaders...")
     train_loader = get_patch_rank_loader(
-        data_root, 
+        args.data_root, 
         split='train',
         batch_size=args.batch_size,
         num_workers=args.num_workers,
@@ -55,7 +55,7 @@ def main():
     )
     
     val_loader = get_patch_rank_loader(
-        data_root, 
+        args.data_root, 
         split='val',
         batch_size=args.batch_size,
         num_workers=args.num_workers
