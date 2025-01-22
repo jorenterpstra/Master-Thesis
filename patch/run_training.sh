@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=patch_scorer
-#SBATCH --time=24:00:00
+#SBATCH --time=5d-00:00:00
 
 # Print job information
 echo "Job ID: $SLURM_JOB_ID"
