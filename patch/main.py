@@ -6,6 +6,7 @@ from dataloader import get_patch_rank_loader
 from torch.utils.data import random_split
 import json
 import argparse
+import os
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train patch scoring model')
@@ -25,16 +26,23 @@ def parse_args():
                         help='Plot predictions every N epochs')
     return parser.parse_args()
 
+def print_gpu_info():
+    """Print GPU information and memory usage"""
+    if torch.cuda.is_available():
+        gpu_id = int(os.environ.get('CUDA_VISIBLE_DEVICES', 0))
+        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+        print(f"GPU ID: {gpu_id}")
+        print(f"Memory Usage:")
+        print(f"Allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f}MB")
+        print(f"Cached: {torch.cuda.memory_reserved(0) / 1024**2:.2f}MB")
+
 def main():
     args = parse_args()
     
-    # Setup paths
-    data_root = Path(args.data_root)
-    save_root = Path(args.save_root)
-    
-    # Setup device
+    # Setup device and print GPU info
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
+    print_gpu_info()
     
     # Data loading
     print("\nSetting up data loaders...")
@@ -109,6 +117,10 @@ def main():
     
     print(f"\nTraining completed!")
     print(f"Best epoch: {best_epoch} with validation loss: {min(val_losses):.4f}")
+    
+    # Monitor GPU usage during training
+    print("\nGPU state after training:")
+    print_gpu_info()
 
 if __name__ == "__main__":
     main()
