@@ -2,13 +2,9 @@
 #SBATCH --job-name=patch_scorer
 #SBATCH --output=logs/%j_out.log    # %j is replaced by the job ID
 #SBATCH --error=logs/%j_err.log     # Separate file for errors
-#SBATCH --time=24:00:00
+#SBATCH --time=10:00:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32GB
-#SBATCH --partition=gpu    # Specify the GPU partition
+#SBATCH --mem=16GB
 
 # Create logs directory if it doesn't exist
 mkdir -p logs
