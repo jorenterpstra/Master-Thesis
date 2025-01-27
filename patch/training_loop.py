@@ -71,6 +71,12 @@ class TrainingConfig:
         self.loss = loss or {'alpha': 1.0, 'beta': 0.0}
         self.distributed = distributed  # Store distributed training settings
         
+        # Set device based on distributed configuration
+        if self.distributed and self.distributed['enabled']:
+            self.device = torch.device(f"cuda:{self.distributed['local_rank']}")
+        else:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
         # Create save directory with timestamp
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         self.save_dir = self.save_dir / timestamp
@@ -89,6 +95,7 @@ class TrainingConfig:
             'num_epochs': self.num_epochs,
             'batch_size': self.batch_size,
             'num_workers': self.num_workers,
+            'device': str(self.device),
             'optimizer': self.optimizer,
             'scheduler': self.scheduler,
             'loss': self.loss,
