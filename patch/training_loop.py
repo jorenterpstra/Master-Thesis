@@ -44,61 +44,39 @@ class PatchScoreLoss(nn.Module):
         return self.alpha * mse_loss + self.beta * rank_loss
 
 class TrainingConfig:
-    """Enhanced configuration for training settings"""
-    def __init__(self, 
-                 # Logging settings
-                 verbose=1,           # 0: silent, 1: progress bars, 2: + epoch stats
-                 save_dir='runs/patch_scorer',
-                 plot_every=5,        # Plot predictions every N epochs
-                 save_best=True,      # Whether to save best model
-                 
-                 # Training settings
-                 num_epochs=100,
-                 batch_size=32,
-                 num_workers=4,
-                 device='cuda',
-                 
-                 # Optimizer settings
-                 optimizer=None,  # Now accepts None
-                 
-                 # Scheduler settings
-                 scheduler=None,  # Now accepts None
-                 
-                 # Loss settings
-                 loss=None):     # Now accepts None
-        
-        # Basic settings
+    """Configuration class for training parameters"""
+    def __init__(
+        self,
+        verbose=1,
+        save_dir='runs',
+        plot_every=None,
+        save_best=True,
+        num_epochs=50,
+        batch_size=32,
+        num_workers=4,
+        optimizer=None,
+        scheduler=None,
+        loss=None,
+        distributed=None  # Add distributed parameter
+    ):
         self.verbose = verbose
+        self.save_dir = Path(save_dir)
         self.plot_every = plot_every
         self.save_best = save_best
-        
-        # Training settings
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.device = device if torch.cuda.is_available() else 'cpu'
-        
-        # Set default configurations if None
-        self.optimizer = optimizer if optimizer is not None else {
-            'name': 'sgd',
-            'lr': 0.01,
-            'momentum': 0.9,
-            'weight_decay': 1e-4
-        }
-        
-        self.scheduler = scheduler  # Can be None
-        
-        self.loss = loss if loss is not None else {
-            'alpha': 0.7,
-            'beta': 0.3
-        }
+        self.optimizer = optimizer or {'name': 'sgd', 'lr': 0.001}
+        self.scheduler = scheduler
+        self.loss = loss or {'alpha': 1.0, 'beta': 0.0}
+        self.distributed = distributed  # Store distributed training settings
         
         # Create save directory with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.save_dir = Path(save_dir) / timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self.save_dir = self.save_dir / timestamp
         self.save_dir.mkdir(parents=True, exist_ok=True)
         
-        # Save configuration
+        # Save configuration using the correct method name
         self.save_config()
     
     def save_config(self):
@@ -111,10 +89,10 @@ class TrainingConfig:
             'num_epochs': self.num_epochs,
             'batch_size': self.batch_size,
             'num_workers': self.num_workers,
-            'device': self.device,
             'optimizer': self.optimizer,
             'scheduler': self.scheduler,
-            'loss': self.loss
+            'loss': self.loss,
+            'distributed': self.distributed  # Add distributed config to saved config
         }
         
         with open(self.save_dir / 'config.json', 'w') as f:
