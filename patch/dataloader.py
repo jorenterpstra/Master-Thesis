@@ -110,7 +110,7 @@ def generate_scores(image_size, bboxes, patch_size=16):
     return scores.reshape(-1)
 
 class ImageNetPatchRankLoader(torch.utils.data.Dataset):
-    def __init__(self, root_dir, split='train', transform=None, verbose=0):
+    def __init__(self, root_dir, split='train', transform=None, verbose=0, return_boxes=False):
         """
         Args:
             root_dir: Path to ImageNet dataset
@@ -121,6 +121,7 @@ class ImageNetPatchRankLoader(torch.utils.data.Dataset):
         self.split = split
         self.transform = transform
         self.verbose = verbose
+        self.return_boxes = return_boxes
         
         # Setup paths
         self.image_dir = self.root_dir / split
@@ -265,11 +266,14 @@ class ImageNetPatchRankLoader(torch.utils.data.Dataset):
             image = transforms.ToTensor()(image)
             image = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                       std=[0.229, 0.224, 0.225])(image)
-            
+            if self.return_boxes:
+                return image, scores, transformed_bboxes
             return image, scores
         
         # If no transform, use original dimensions
         scores = generate_scores(min(orig_size), bboxes)
+        if self.return_boxes:
+            return image, scores, bboxes
         return image, scores
 
 def get_patch_rank_loader(root_dir, split='train', batch_size=32, num_workers=4, **kwargs):

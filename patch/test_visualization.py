@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
-from patch.dataloader import ImageNetPatchRankLoader
+from dataloader import ImageNetPatchRankLoader
 import torchvision.transforms as transforms
 from PIL import Image, ImageDraw
 import torch
@@ -48,8 +48,8 @@ def visualize_sample(root_dir, split='train', idx=0):
                            std=[0.229, 0.224, 0.225])
     ])
     
-    dataset_raw = ImageNetPatchRankLoader(root_dir, split, transform=None)
-    dataset_transformed = ImageNetPatchRankLoader(root_dir, split, transform=transform)
+    dataset_raw = ImageNetPatchRankLoader(root_dir, split, transform=None, return_boxes=True)
+    dataset_transformed = ImageNetPatchRankLoader(root_dir, split, transform=transform, return_boxes=True)
     
     # Get both versions
     image_raw, _, orig_boxes = dataset_raw[idx]
