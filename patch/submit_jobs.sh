@@ -1,7 +1,4 @@
 #!/bin/bash
 
 # Submit job with specific GPU type
-sbatch --constraint="gpu_mem:6gb"--batch-size=128 run_training.sh
-
-# Submit job with specific GPU type
-sbatch --constraint="gpu_mem:8gb"--batch-size=256 run_training.sh
+sbatch --batch-size=128 --time=10-00:00:00 --gres=gpu:1 --mem=16G --cpus-per-task=4 

@@ -31,7 +31,7 @@ nvidia-smi -i $GPU_ID
 # Run the training script with GPU info
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
-    --save-root /scratch/6403840/Master-Thesis/patch/runs/imagenet_training \
+    --save-root /scratch/6403840/Master-Thesis/patch/runs/global_resnet \
     --batch-size 256 \
     --num-workers 5 \
     --epochs 100 \
