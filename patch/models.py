@@ -245,10 +245,10 @@ def get_model(model_name='patch', **kwargs):
             'weight_decay': 1e-4
         },
         'resnet': {
-            'name': 'sgd',
-            'lr': 0.001,
-            'momentum': 0.9,
-            'weight_decay': 1e-4
+            'name': 'adamw',
+            'lr': 0.0001,
+            'weight_decay': 0.01,
+            'betas': (0.9, 0.999)
         },
         'global_resnet': {
             'name': 'adamw',

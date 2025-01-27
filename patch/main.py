@@ -103,7 +103,7 @@ def main():
     
     # Initialize model
     model = get_model(
-        'global_resnet',  # or use an argument to select model type
+        'resnet',  # or use an argument to select model type
         patch_size=16,
         hidden_dim=512,
         num_patches=14
