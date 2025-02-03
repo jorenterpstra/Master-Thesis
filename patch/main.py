@@ -7,7 +7,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 from pathlib import Path
-from models import PatchEmbeddingScorer, get_model
+from models import PatchEmbeddingScorer, get_model, load_checkpoint  # Add load_checkpoint import
 from training_loop import TrainingConfig, train_model
 from dataloader import get_patch_rank_loader
 import json
@@ -34,6 +34,13 @@ def parse_args():
                        help='Enable distributed training')
     parser.add_argument('--local_rank', type=int, default=-1,
                        help='Local rank for distributed training')
+    parser.add_argument('--model-type', type=str, default='resnet',
+                      choices=['patch', 'resnet', 'global_resnet'],
+                      help='Type of model architecture to use')
+    parser.add_argument('--checkpoint', type=str, default=None,
+                      help='Path to checkpoint to load (for evaluation or fine-tuning)')
+    parser.add_argument('--eval-only', action='store_true',
+                      help='Only run evaluation on validation set')
     return parser.parse_args()
 
 def setup_distributed(args):
@@ -101,17 +108,37 @@ def main():
     if not args.distributed or args.local_rank <= 0:
         print(f"Dataset sizes - Train: {len(train_loader.dataset)}, Val: {len(val_loader.dataset)}")
     
-    # Initialize model
-    model = get_model(
-        'resnet',  # or use an argument to select model type
-        patch_size=16,
-        hidden_dim=512,
-        num_patches=14
-    ).to(device)
+    # Initialize model or load from checkpoint
+    if args.checkpoint:
+        if not args.distributed or args.local_rank <= 0:
+            print(f"Loading checkpoint from {args.checkpoint}")
+        model, checkpoint = load_checkpoint(
+            args.checkpoint,
+            model_name=args.model_type,
+            patch_size=16,
+            hidden_dim=512,
+            num_patches=14
+        )
+        model = model.to(device)
+    else:
+        model = get_model(
+            args.model_type,
+            patch_size=16,
+            hidden_dim=512,
+            num_patches=14
+        ).to(device)
     
     # Wrap model in DDP
     if args.distributed:
         model = DDP(model, device_ids=[args.local_rank])
+    
+    # If eval only, run validation and exit
+    if args.eval_only:
+        model.eval()
+        if not args.distributed or args.local_rank <= 0:
+            print("Running evaluation only...")
+        # TODO: Implement validation-only loop if needed
+        return
     
     # Use model's default optimizer settings
     optimizer_config = getattr(model.module if args.distributed else model, 'default_optimizer', {

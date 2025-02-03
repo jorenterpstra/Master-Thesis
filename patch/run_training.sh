@@ -31,12 +31,24 @@ nvidia-smi -i $GPU_ID
 # Run the training script with GPU info
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
-    --save-root /scratch/6403840/Master-Thesis/patch/runs/local_resnet \
-    --batch-size 256 \
+    --save-root /scratch/6403840/Master-Thesis/patch/runs/local_custom \
+    --batch-size 64 \
     --num-workers 5 \
     --epochs 100 \
-    --lr 0.001 \
-    --plot-every 5
+    --plot-every 5 \
+    --model-type resnet \
+    --checkpoint /scratch/6403840/Master-Thesis/patch/runs/imagenet_training/20250122_212642
+
+# Example commands (commented out):
+# Training from scratch with different model:
+#   --model-type patch
+#   --model-type global_resnet
+
+# Fine-tuning from checkpoint:
+#   --model-type resnet --checkpoint /path/to/checkpoint.pth
+
+# Evaluation only:
+#   --model-type resnet --checkpoint /path/to/checkpoint.pth --eval-only
 
 # Print completion info
 echo "End time: $(date)"

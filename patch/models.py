@@ -236,33 +236,19 @@ def get_model(model_name='patch', **kwargs):
         'global_resnet': GlobalResNetScorer
     }
     
-    # Default optimizer configurations per model
-    default_optimizers = {
-        'patch': {
-            'name': 'sgd',
-            'lr': 0.001,
-            'momentum': 0.9,
-            'weight_decay': 1e-4
-        },
-        'resnet': {
-            'name': 'adamw',
-            'lr': 0.0001,
-            'weight_decay': 0.01,
-            'betas': (0.9, 0.999)
-        },
-        'global_resnet': {
-            'name': 'adamw',
-            'lr': 0.0001,
-            'weight_decay': 0.01,
-            'betas': (0.9, 0.999)
-        }
+    # Unified AdamW configuration for all models
+    default_optimizer = {
+        'name': 'adamw',
+        'lr': 0.0001,
+        'weight_decay': 0.01,
+        'betas': (0.9, 0.999)
     }
     
     if model_name not in models:
         raise ValueError(f"Model {model_name} not found. Available models: {list(models.keys())}")
     
     model = models[model_name](**kwargs)
-    model.default_optimizer = default_optimizers[model_name]
+    model.default_optimizer = default_optimizer
     
     return model
 

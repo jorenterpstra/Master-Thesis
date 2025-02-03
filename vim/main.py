@@ -377,7 +377,6 @@ def main(args):
         except:
             print('no patch embed')
     
-    model.to(device)
     if args.debug:
         print(f"------------- The model is being loaded to device {device}")
         print(f"------------- The device the model is on: {next(model.parameters()).device}")
@@ -398,6 +397,7 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    model.to(device)
     print('number of params:', n_parameters)
 
     if not args.unscale_lr:
@@ -489,6 +489,7 @@ def main(args):
     if args.local_rank == 0 and args.gpu == 0:
         mlflow.log_param("n_parameters", n_parameters)
 
+    # -- main loop ---
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     max_accuracy = 0.0

@@ -2,10 +2,9 @@
 #conda activate vim;
 #cd Master_thesis/vim;
 
-CUDA_VISIBLE_DEVICES=2,3 torchrun \
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun \
     --nnodes=1 \
-    --nproc-per-node=4\
-    --max-restarts=3 \
+    --nproc-per-node=4 \
     main.py \
     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 128 \
@@ -19,7 +18,6 @@ CUDA_VISIBLE_DEVICES=2,3 torchrun \
     --mixup 0.0 \
     --cutmix 0.0 \
     --debug \
-    --rdzv_endpoint=localhost:29400
 
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
