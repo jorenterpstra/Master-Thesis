@@ -32,7 +32,7 @@ nvidia-smi -i $GPU_ID
 python main.py \
     --data-root /scratch/6403840/data/imagenet \
     --save-root /scratch/6403840/Master-Thesis/patch/runs/local_custom \
-    --batch-size 64 \
+    --batch-size 128 \
     --num-workers 5 \
     --epochs 100 \
     --plot-every 5 \
