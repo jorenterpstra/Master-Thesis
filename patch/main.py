@@ -112,6 +112,7 @@ def main():
     if args.checkpoint:
         if not args.distributed or args.local_rank <= 0:
             print(f"Loading checkpoint from {args.checkpoint}")
+        print("\nInitializing model from checkpoint...")
         model, checkpoint = load_checkpoint(
             args.checkpoint,
             model_name=args.model_type,
@@ -121,6 +122,7 @@ def main():
         )
         model = model.to(device)
     else:
+        print("\nInitializing model...")
         model = get_model(
             args.model_type,
             patch_size=16,
