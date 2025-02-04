@@ -36,8 +36,8 @@ python main.py \
     --num-workers 5 \
     --epochs 100 \
     --plot-every 5 \
-    --model-type resnet \
-    --checkpoint /scratch/6403840/Master-Thesis/patch/runs/imagenet_training/20250122_212642
+    --model-type patch \
+    --checkpoint /scratch/6403840/Master-Thesis/patch/runs/imagenet_training/
 
 # Example commands (commented out):
 # Training from scratch with different model:
