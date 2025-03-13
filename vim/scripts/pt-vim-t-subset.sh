@@ -1,8 +1,23 @@
 #!/bin/bash
-#conda activate vim;
-#cd Master_thesis/vim;
+#SBATCH --job-name=vim-extra-tiny
+#SBATCH --time=10-00:00:00
 
-CUDA_VISIBLE_DEVICES=1 torchrun \
+# Get least used GPU before loading any CUDA modules but print how much memory is used for all GPUs
+GPU_ID=$(nvidia-smi --query-gpu=memory.used,index --format=csv,noheader,nounits | \
+         sort -n | \
+         head -n1 | \
+         cut -d, -f2)
+
+# Export GPU selection BEFORE loading modules
+export CUDA_VISIBLE_DEVICES=$GPU_ID
+echo "Setting CUDA_VISIBLE_DEVICES=$GPU_ID"
+
+# Load modules
+module load cuda/11.8
+source ~/.bashrc
+conda activate vim
+
+torchrun \
     --nproc_per_node=1 \
     main.py \
     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
@@ -10,7 +25,7 @@ CUDA_VISIBLE_DEVICES=1 torchrun \
     --drop-path 0.0 \
     --weight-decay 0.1 \
     --num_workers 16 \
-    --data-path /storage/scratch/6403840/data/imagenet_subset \
+    --data-path /storage/scratch/6403840/data/imagenet-tiny \
     --output_dir ./output/vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --no_amp \
     --pin-mem \
