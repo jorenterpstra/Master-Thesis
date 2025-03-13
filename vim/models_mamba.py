@@ -632,7 +632,7 @@ def vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_
     model = VisionMamba(
         patch_size=16, 
         embed_dim=96,  # Reduced from 192 to reduce model size
-        depth=12,      # Reduced from 24 to reduce model size
+        depth=24,     
         rms_norm=True, 
         residual_in_fp32=True,
         fused_add_norm=True,

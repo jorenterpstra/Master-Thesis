@@ -51,7 +51,14 @@ def visualize_patch_calculation(image_size=224, patch_size=16, bboxes=None):
     ax1.set_ylim(image_size, 0)
     
     # Plot 2: Heatmap of scores
-    im = ax2.imshow(score_grid, cmap='hot')
+    # Option 1: Using 'seismic' - blue for low values, black for middle, red for high
+    im = ax2.imshow(score_grid, cmap='seismic')
+    
+    # Option 2: Using 'RdBu_r' - blue for high values, black for middle, red for low
+    # im = ax2.imshow(score_grid, cmap='RdBu_r', vmin=0, vmax=1)
+    
+    # Option 3: Using 'bwr' - blue for low, black for middle, red for high
+    # im = ax2.imshow(score_grid, cmap='bwr', vmin=0, vmax=1)
     ax2.set_title(f"Patch Scores ({num_patches}x{num_patches})")
     plt.colorbar(im, ax=ax2)
 
@@ -109,6 +116,19 @@ def test_edge_cases():
                 [32, 32, 160, 160],    # Larger box around it
             ]
         },
+        {
+            'name': '2x2 Box', # Test small box
+            'bbox': [96, 96, 32, 32]  # 2x2 box at the bottom-right
+        },
+        {
+            'name': 'Multiple Boxes',
+            'bbox': [
+                [32, 32, 64, 64],  # Center box
+                [16, 16, 32, 32],  # Small box inside center
+                [128, 128, 64, 64],  # Bottom-right box
+            ]
+        }
+
     ]
     
     for case in test_cases:

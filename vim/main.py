@@ -522,6 +522,15 @@ def main(args):
         test_stats = evaluate(data_loader_val, model, device, amp_autocast)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         
+        # Print comparison of training and validation metrics to monitor overfitting
+        train_acc1 = train_stats.get('train_acc1', 0)  # Default to 0 if not available (e.g. with mixup)
+        print(f"Epoch {epoch} stats - Train: loss={train_stats['loss']:.4f}, acc1={train_acc1:.1f}% | Val: loss={test_stats['loss']:.4f}, acc1={test_stats['acc1']:.1f}%")
+        
+        # Add training-validation accuracy difference to detect overfitting
+        if 'train_acc1' in train_stats:
+            acc_diff = train_acc1 - test_stats['acc1']
+            print(f"Train-Val accuracy gap: {acc_diff:.1f}% {'(Potential overfitting)' if acc_diff > 10 else ''}")
+        
         if max_accuracy < test_stats["acc1"]:
             max_accuracy = test_stats["acc1"]
             if args.output_dir:

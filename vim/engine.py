@@ -25,6 +25,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
     model.train(set_training_mode)
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    # Add accuracy metrics for training
+    metric_logger.add_meter('train_acc1', utils.SmoothedValue(window_size=10, fmt='{value:.3f}'))
+    metric_logger.add_meter('train_acc5', utils.SmoothedValue(window_size=10, fmt='{value:.3f}'))
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
     
@@ -45,6 +48,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         if args.debug:
             print(f'------------- Samples are now loaded on device {samples.device}' )
             print(f"------------- The target is now loaded on device {targets.device}")
+
+        original_targets = targets.clone()  # Save original targets for accuracy calculation
+        
         if mixup_fn is not None:
             # print('Mixing up samples')
             samples, targets = mixup_fn(samples, targets)
@@ -76,6 +82,21 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         loss_value = loss.item()
         if args.debug:
             print('Loss value calculated = ', loss_value)
+
+        # Calculate training accuracy (only when not using mixup or cosub to ensure valid metrics)
+        if not args.cosub and mixup_fn is None:
+            acc1, acc5 = accuracy(outputs, original_targets, topk=(1, 5))
+            metric_logger.meters['train_acc1'].update(acc1.item(), n=samples.shape[0])
+            metric_logger.meters['train_acc5'].update(acc5.item(), n=samples.shape[0])
+        elif not args.cosub:
+            # If using mixup, we need a rough accuracy estimate
+            # This won't be totally accurate but gives a trend
+            with torch.no_grad():
+                # Get predictions on the original data
+                pred_outputs = model(samples)
+                acc1, acc5 = accuracy(pred_outputs, original_targets, topk=(1, 5))
+                metric_logger.meters['train_acc1'].update(acc1.item(), n=samples.shape[0])
+                metric_logger.meters['train_acc5'].update(acc5.item(), n=samples.shape[0])
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))

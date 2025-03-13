@@ -38,15 +38,9 @@ class BoundingBoxTransform:
 def generate_scores(image_size, bboxes, patch_size=16):
     """
     Generate scores for each patch based on:
-    1. Intersection with bounding box
-    2. Distance from center of bounding box
+    1. Inside bounding box: Positive score based on proximity to center
+    2. Outside bounding box: Negative score based on distance to nearest bbox CENTER
     Using vectorized operations for better performance.
-    Args:
-        image_size: size of the input image (e.g., 224 for a 224x224 image)
-        bboxes: list of bounding boxes, each [x, y, w, h] scaled to current image size
-        patch_size: size of each patch (default: 16)
-    Returns:
-        scores: 1D tensor of patch scores (length = num_patches²)
     """
     if isinstance(image_size, tuple):
         image_size = min(image_size)
@@ -64,6 +58,12 @@ def generate_scores(image_size, bboxes, patch_size=16):
     # Create meshgrid of patch centers
     grid_y, grid_x = torch.meshgrid(patch_centers, patch_centers, indexing='ij')
     
+    # Track which patches fall inside at least one bounding box
+    has_intersection = torch.zeros((num_patches, num_patches), dtype=torch.bool)
+    
+    # Track distances from each patch to nearest bbox center
+    min_distances_to_center = torch.ones((num_patches, num_patches)) * float('inf')
+    
     # Process each bbox
     for bbox in bboxes:
         x, y, w, h = map(float, bbox)
@@ -79,12 +79,21 @@ def generate_scores(image_size, bboxes, patch_size=16):
         center_y = y + h / 2
         
         # Calculate distances from patch centers to bbox center
-        dx = (grid_x - center_x) / w
-        dy = (grid_y - center_y) / h
+        dx = (grid_x - center_x) / w if w > 0 else (grid_x - center_x)
+        dy = (grid_y - center_y) / h if h > 0 else (grid_y - center_y)
         distances = torch.sqrt(dx**2 + dy**2)
         
-        # Calculate Gaussian-like center weights
-        center_weights = torch.exp(-distances**2 / 0.5)
+        # Calculate distances from patch centers to bbox center (in pixels, not normalized)
+        pixel_dx = grid_x - center_x
+        pixel_dy = grid_y - center_y
+        pixel_distances = torch.sqrt(pixel_dx**2 + pixel_dy**2)
+        
+        # Update minimum distances to any bbox center
+        min_distances_to_center = torch.minimum(min_distances_to_center, pixel_distances)
+        
+        # Calculate Gaussian-like center weights with wider spread 
+        # to create more distinctive values inside bounding boxes
+        center_weights = torch.exp(-distances**2 / 0.45)  # Value of 0.45 provides good balance
         
         # Calculate intersection areas
         x_min = torch.maximum(grid_x - patch_size/2, torch.tensor(x))
@@ -100,12 +109,64 @@ def generate_scores(image_size, bboxes, patch_size=16):
         # Calculate intersection ratios
         intersection_ratios = intersections / (patch_size * patch_size)
         
+        # Track patches that have intersection with any bounding box
+        has_intersection = has_intersection | (intersection_ratios > 0)
+        
         # Combine intersection ratios with center weights
         patch_scores = intersection_ratios * center_weights
+        
         scores += patch_scores
     
-    # Normalize by number of boxes
-    scores = scores / num_boxes
+    # Assign negative scores to patches outside all bounding boxes
+    # The further from any center, the more negative the score
+    outside_mask = ~has_intersection
+    if outside_mask.any():
+        # Normalize distances by image diagonal for consistent scaling
+        diagonal = torch.sqrt(torch.tensor(image_size**2 + image_size**2, dtype=torch.float))
+        normalized_distances = min_distances_to_center[outside_mask] / diagonal
+        
+        # Create negative scores that decrease as distance increases
+        # Using a non-linear curve to create more differentiation
+        negative_scores = -0.5 * normalized_distances**1.5  # Added exponent for more aggressive falloff
+        
+        scores[outside_mask] = negative_scores
+    
+    # Soft normalization as a compromise:
+    # - Preserves more of the natural distribution
+    # - Still keeps values in consistent ranges
+    # - Adds small buffers to avoid exact boundary values
+    if scores.min() < 0 and scores.max() > 0:
+        # Handle positive scores - normalize to [0, 1] with buffer
+        pos_mask = scores > 0
+        if pos_mask.any():
+            pos_min = scores[pos_mask].min()
+            pos_max = scores[pos_mask].max()
+            
+            if pos_max > pos_min:  # Avoid division by zero
+                # Calculate normalization with 10% buffers on each end
+                buffer = 0.1 * (pos_max - pos_min)
+                
+                # Scale to range [0.05, 0.95] instead of [0, 1]
+                scores[pos_mask] = 0.05 + 0.9 * (scores[pos_mask] - pos_min) / (pos_max - pos_min)
+            else:
+                # All positive scores are equal
+                scores[pos_mask] = 0.5  # Set to middle of range
+        
+        # Handle negative scores - normalize to [-1, 0] with buffer
+        neg_mask = scores < 0
+        if neg_mask.any():
+            neg_min = scores[neg_mask].min()
+            neg_max = scores[neg_mask].max()
+            
+            if neg_min < neg_max:  # Avoid division by zero
+                # Calculate normalization with 10% buffers on each end
+                buffer = 0.1 * (neg_max - neg_min)
+                
+                # Scale to range [-0.95, -0.05] instead of [-1, 0]
+                scores[neg_mask] = -0.95 + 0.9 * (scores[neg_mask] - neg_min) / (neg_max - neg_min)
+            else:
+                # All negative scores are equal
+                scores[neg_mask] = -0.5  # Set to middle of range
     
     return scores.reshape(-1)
 
@@ -371,6 +432,7 @@ def test_dataloader_shapes(root_dir, batch_size=4):
     
     print("\nAll batches processed successfully!")
     return batch_shapes
+    
 
 if __name__ == "__main__":
     data_root = Path("C:/Users/joren/Documents/_Uni/Master/Thesis/imagenet_subset")
