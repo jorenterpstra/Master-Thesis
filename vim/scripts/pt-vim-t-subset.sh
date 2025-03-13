@@ -17,7 +17,7 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate vim
 
-python main.py \
+torchrun main.py \
     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 64 \
     --drop-path 0.0 \
