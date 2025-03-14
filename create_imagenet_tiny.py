@@ -5,6 +5,42 @@ import argparse
 from pathlib import Path
 import json
 from tqdm import tqdm
+import hashlib
+import sys
+from collections import defaultdict
+
+def compute_file_hash(file_path, chunk_size=8192):
+    """Compute MD5 hash of a file."""
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+def find_all_files(directory, extensions):
+    """Find all files with specified extensions in directory and subdirectories.
+    Returns a dictionary mapping filenames to their full paths."""
+    directory = Path(directory)
+    file_dict = {}
+    
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if extensions is None or any(file.lower().endswith(ext.lower()) for ext in extensions):
+                file_dict[file] = os.path.join(root, file)
+    return file_dict
+
+def check_data_leakage(train_dir, val_dir, extensions=None):
+    """Check for filename duplicates between training and validation sets."""
+    if extensions is None:
+        extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.JPEG']
+        
+    train_files = find_all_files(train_dir, extensions)
+    val_files = find_all_files(val_dir, extensions)
+    
+    # Find duplicates (same filename in both sets)
+    duplicates = set(train_files.keys()).intersection(set(val_files.keys()))
+    
+    return bool(duplicates), duplicates
 
 def create_imagenet_tiny(
     source_imagenet_path,
@@ -12,6 +48,7 @@ def create_imagenet_tiny(
     num_classes=200,
     num_train_images=100000,
     num_val_images=10000,
+    enforce_no_leakage=True
 ):
     """
     Create a smaller version of ImageNet with specified parameters.
@@ -22,6 +59,7 @@ def create_imagenet_tiny(
         num_classes: Number of classes to include
         num_train_images: Total number of training images
         num_val_images: Total number of validation images
+        enforce_no_leakage: If True, strictly enforce no data leakage
     """
     source_path = Path(source_imagenet_path)
     target_path = Path(target_path)
@@ -62,62 +100,42 @@ def create_imagenet_tiny(
     total_train_copied = 0
     total_val_copied = 0
     
-    # Process training images by class
-    for class_dir in tqdm(selected_classes, desc="Processing training classes"):
-        class_name = class_dir.name
-        
-        # Create target class directories
-        target_train_class_dir = target_train_dir / class_name
-        target_train_bbox_class_dir = target_train_bbox_dir / class_name
-        
-        target_train_class_dir.mkdir(exist_ok=True)
-        target_train_bbox_class_dir.mkdir(exist_ok=True)
-        
-        # Get all training images for this class
-        train_images = list(class_dir.glob('*.JPEG'))
-        
-        # Select random training images
-        selected_train_images = random.sample(
-            train_images, 
-            min(train_images_per_class, len(train_images))
-        )
-        
-        # Copy training images and their bounding boxes
-        for img_path in selected_train_images:
-            # Copy image
-            target_img_path = target_train_class_dir / img_path.name
-            shutil.copy2(img_path, target_img_path)
-            
-            # Copy corresponding bbox file if it exists
-            bbox_path = source_path / 'train_bbox' / class_name / f"{img_path.stem}.xml"
-            if bbox_path.exists():
-                target_bbox_path = target_train_bbox_class_dir / f"{img_path.stem}.xml"
-                shutil.copy2(bbox_path, target_bbox_path)
-            
-            total_train_copied += 1
+    # Track file hashes to prevent duplicates
+    all_file_hashes = set()
+    filename_registry = set()
     
-    # Process validation images
-    print("Processing validation images...")
-    
-    # Check if validation images are in class subfolders (like training) or in a flat structure
+    # First, collect all validation images to exclude from training
+    print("Collecting validation images first to prevent data leakage...")
+    val_images_to_copy = {}  # class_name -> [image_paths]
     val_has_subfolders = any((source_path / 'val').glob('*/'))
     
-    # Collect validation images for selected classes
-    val_images_by_class = {cls: [] for cls in selected_class_names}
+    # Dictionary to track all filenames by class
+    all_filenames_by_class = defaultdict(set)
     
+    # VALIDATION IMAGE COLLECTION
     if val_has_subfolders:
         # If validation images are organized in class folders
         for class_name in selected_class_names:
             val_class_dir = source_path / 'val' / class_name
             if val_class_dir.exists() and val_class_dir.is_dir():
                 val_images = list(val_class_dir.glob('*.JPEG'))
-                val_images_by_class[class_name].extend(val_images)
+                
+                # Add all filenames to registry for this class
+                for img_path in val_images:
+                    all_filenames_by_class[class_name].add(img_path.name)
+                
+                # Select random validation images
+                selected_val = random.sample(
+                    val_images, 
+                    min(val_images_per_class, len(val_images))
+                )
+                val_images_to_copy[class_name] = selected_val
     else:
-        # If validation images are in a flat structure with a mapping file
-        # This assumes there's some way to know which class each validation image belongs to
-        # For example, through a mapping file or naming convention
+        # Handle flat validation structure with mapping file
+        # This code remains largely the same as the original, but we collect images to be used
+        # Instead of copying them immediately
         
-        # Check for validation class mapping files (common formats)
+        # Check for validation class mapping files
         mapping_paths = [
             source_path / "val_annotations.txt",
             source_path / "val_map.txt",
@@ -145,78 +163,198 @@ def create_imagenet_tiny(
                             val_img_to_class[img_name] = class_id
             
             # Group validation images by class
+            all_val_images_by_class = defaultdict(list)
             for img_path in (source_path / 'val').glob('*.JPEG'):
                 img_name = img_path.name
                 if img_name in val_img_to_class and val_img_to_class[img_name] in selected_class_names:
                     class_name = val_img_to_class[img_name]
-                    val_images_by_class[class_name].append(img_path)
+                    all_val_images_by_class[class_name].append(img_path)
+                    all_filenames_by_class[class_name].add(img_name)
+            
+            # Select random validation images from each class
+            for class_name in selected_class_names:
+                images = all_val_images_by_class.get(class_name, [])
+                if images:
+                    selected_val = random.sample(
+                        images,
+                        min(val_images_per_class, len(images))
+                    )
+                    val_images_to_copy[class_name] = selected_val
         else:
             print("Warning: No validation mapping file found. Using folder structure to infer classes.")
-            # Try to infer class from image name or another method
-            # This is just a fallback approach and may not work for all datasets
+            # Simplified approach - distribute validation images evenly
             val_images = list((source_path / 'val').glob('*.JPEG'))
             
+            # Track all validation filenames
+            val_filenames = {img_path.name for img_path in val_images}
+            
             # Distribute validation images evenly among selected classes
-            # (This is a simplification and not ideal for a real scenario)
+            images_per_class = {}
+            for class_name in selected_class_names:
+                images_per_class[class_name] = []
+            
             for i, img_path in enumerate(val_images):
                 class_idx = i % len(selected_class_names)
                 class_name = selected_class_names[class_idx]
-                val_images_by_class[class_name].append(img_path)
+                images_per_class[class_name].append(img_path)
+                all_filenames_by_class[class_name].add(img_path.name)
+            
+            # Select a subset for each class
+            for class_name in selected_class_names:
+                images = images_per_class[class_name]
+                if images:
+                    selected_val = random.sample(
+                        images,
+                        min(val_images_per_class // len(selected_class_names), len(images))
+                    )
+                    val_images_to_copy[class_name] = selected_val
     
-    # Copy validation images
-    for class_name, images in tqdm(val_images_by_class.items(), desc="Copying validation images"):
+    # TRAINING IMAGE SELECTION (excluding validation filenames)
+    print("Processing training classes (avoiding validation images)...")
+    train_images_to_copy = {}  # class_name -> [image_paths]
+    
+    for class_dir in tqdm(selected_classes, desc="Selecting training images"):
+        class_name = class_dir.name
+        
+        # Get all training images for this class
+        all_train_images = list(class_dir.glob('*.JPEG'))
+        
+        # Get validation filenames for this class to exclude
+        validation_filenames = all_filenames_by_class.get(class_name, set())
+        
+        # Filter out training images that have the same filename as validation images
+        filtered_train_images = [
+            img for img in all_train_images 
+            if img.name not in validation_filenames
+        ]
+        
+        if not filtered_train_images:
+            print(f"Warning: No training images available for class {class_name} after filtering out validation filenames")
+            continue
+            
+        # Select random training images
+        selected_train = random.sample(
+            filtered_train_images,
+            min(train_images_per_class, len(filtered_train_images))
+        )
+        
+        train_images_to_copy[class_name] = selected_train
+    
+    # COPY VALIDATION IMAGES
+    print("Copying validation images...")
+    for class_name, images in tqdm(val_images_to_copy.items(), desc="Copying validation images"):
         if not images:
             continue
             
-        # Select random validation images for this class
-        selected_val_images = random.sample(
-            images,
-            min(val_images_per_class, len(images))
-        )
-        
-        # If validation images are in class subfolders, maintain that structure
+        # Create class directories if using subfolders
         if val_has_subfolders:
             target_val_class_dir = target_val_dir / class_name
             target_val_class_dir.mkdir(exist_ok=True)
             
-            for img_path in selected_val_images:
-                target_img_path = target_val_class_dir / img_path.name
-                shutil.copy2(img_path, target_img_path)
-                
-                # Copy bbox if available
-                if val_has_subfolders:
-                    bbox_path = source_path / 'val_bbox' / class_name / f"{img_path.stem}.xml"
-                else:
-                    bbox_path = source_path / 'val_bbox' / f"{img_path.stem}.xml"
-                
-                if bbox_path.exists():
-                    if val_has_subfolders:
-                        target_bbox_dir = target_val_bbox_dir / class_name
-                        target_bbox_dir.mkdir(exist_ok=True)
-                        target_bbox_path = target_bbox_dir / f"{img_path.stem}.xml"
-                    else:
-                        target_bbox_path = target_val_bbox_dir / f"{img_path.stem}.xml"
-                    
-                    shutil.copy2(bbox_path, target_bbox_path)
-                
-                total_val_copied += 1
-        else:
-            # For flat validation structure
-            for img_path in selected_val_images:
+            target_val_bbox_class_dir = target_val_bbox_dir / class_name
+            target_val_bbox_class_dir.mkdir(exist_ok=True)
+        
+        for img_path in images:
+            # Check for filename uniqueness
+            if img_path.name in filename_registry:
+                if enforce_no_leakage:
+                    print(f"Warning: Duplicate filename detected: {img_path.name}. Skipping to prevent leakage.")
+                    continue
+            
+            # For content-based duplication check
+            if enforce_no_leakage:
+                img_hash = compute_file_hash(img_path)
+                if img_hash in all_file_hashes:
+                    print(f"Warning: Duplicate image content detected: {img_path.name}. Skipping to prevent leakage.")
+                    continue
+                all_file_hashes.add(img_hash)
+            
+            # Add filename to registry
+            filename_registry.add(img_path.name)
+            
+            # Determine target paths
+            if val_has_subfolders:
+                target_img_path = target_val_dir / class_name / img_path.name
+                bbox_path = source_path / 'val_bbox' / class_name / f"{img_path.stem}.xml"
+                target_bbox_path = target_val_bbox_dir / class_name / f"{img_path.stem}.xml"
+            else:
                 target_img_path = target_val_dir / img_path.name
-                shutil.copy2(img_path, target_img_path)
-                
-                # Copy bbox if available
                 bbox_path = source_path / 'val_bbox' / f"{img_path.stem}.xml"
-                if bbox_path.exists():
-                    target_bbox_path = target_val_bbox_dir / f"{img_path.stem}.xml"
-                    shutil.copy2(bbox_path, target_bbox_path)
-                
-                total_val_copied += 1
+                target_bbox_path = target_val_bbox_dir / f"{img_path.stem}.xml"
+            
+            # Copy image
+            shutil.copy2(img_path, target_img_path)
+            total_val_copied += 1
+            
+            # Copy bbox if available
+            if bbox_path.exists():
+                shutil.copy2(bbox_path, target_bbox_path)
     
-    print(f"Dataset creation complete!")
+    # COPY TRAINING IMAGES
+    print("Copying training images...")
+    for class_name, images in tqdm(train_images_to_copy.items(), desc="Copying training images"):
+        if not images:
+            continue
+        
+        # Create target class directories
+        target_train_class_dir = target_train_dir / class_name
+        target_train_bbox_class_dir = target_train_bbox_dir / class_name
+        
+        target_train_class_dir.mkdir(exist_ok=True)
+        target_train_bbox_class_dir.mkdir(exist_ok=True)
+        
+        for img_path in images:
+            # Check for filename uniqueness
+            if img_path.name in filename_registry:
+                if enforce_no_leakage:
+                    print(f"Warning: Duplicate filename detected: {img_path.name}. Skipping to prevent leakage.")
+                    continue
+            
+            # For content-based duplication check
+            if enforce_no_leakage:
+                img_hash = compute_file_hash(img_path)
+                if img_hash in all_file_hashes:
+                    print(f"Warning: Duplicate image content detected: {img_path.name}. Skipping to prevent leakage.")
+                    continue
+                all_file_hashes.add(img_hash)
+            
+            # Add filename to registry
+            filename_registry.add(img_path.name)
+            
+            # Copy image
+            target_img_path = target_train_class_dir / img_path.name
+            shutil.copy2(img_path, target_img_path)
+            total_train_copied += 1
+            
+            # Copy corresponding bbox file if it exists
+            bbox_path = source_path / 'train_bbox' / class_name / f"{img_path.stem}.xml"
+            if bbox_path.exists():
+                target_bbox_path = target_train_bbox_class_dir / f"{img_path.stem}.xml"
+                shutil.copy2(bbox_path, target_bbox_path)
+    
+    # Verify no data leakage occurred
+    if enforce_no_leakage:
+        print("\nVerifying no data leakage...")
+        has_duplicates, duplicates = check_data_leakage(target_train_dir, target_val_dir, ['.JPEG', '.jpeg'])
+        
+        if has_duplicates:
+            print(f"ERROR: Data leakage detected! Found {len(duplicates)} duplicate filenames.")
+            print("First few duplicates:")
+            for dup in list(duplicates)[:5]:
+                print(f"  {dup}")
+            
+            if "--force" not in sys.argv:
+                print("\nTo keep the dataset despite leakage, run with --force flag.")
+                print("Cleaning up created dataset...")
+                shutil.rmtree(target_path)
+                sys.exit(1)
+        else:
+            print("✅ Verification complete: No data leakage detected!")
+    
+    print(f"\nDataset creation complete!")
     print(f"Copied {total_train_copied} training images and {total_val_copied} validation images")
     print(f"Selected {num_classes} classes: {', '.join(selected_class_names[:5])}... (see selected_classes.json for complete list)")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create ImageNet Tiny dataset with 200 classes")
@@ -226,16 +364,21 @@ if __name__ == "__main__":
     parser.add_argument("--train-images", type=int, default=100000, help="Number of training images")
     parser.add_argument("--val-images", type=int, default=10000, help="Number of validation images")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--no-leakage-check", action="store_false", dest="enforce_no_leakage",
+                       help="Skip strict leakage prevention checks (not recommended)")
+    parser.add_argument("--force", action="store_true", help="Force dataset creation even if leakage is detected")
     
     args = parser.parse_args()
     
     # Set random seed for reproducibility
     random.seed(args.seed)
     print(args)
+    
     create_imagenet_tiny(
         args.source,
         args.target,
         args.classes,
         args.train_images,
-        args.val_images
+        args.val_images,
+        args.enforce_no_leakage
     )
