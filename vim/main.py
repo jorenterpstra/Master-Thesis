@@ -379,7 +379,10 @@ def main(args):
     
     if args.debug:
         print(f"------------- The model is being loaded to device {device}")
+        model.to(device)
         print(f"------------- The device the model is on: {next(model.parameters()).device}")
+    else:
+        model.to(device)
 
     model_ema = None
     if args.model_ema:
@@ -392,7 +395,6 @@ def main(args):
 
     model_without_ddp = model
     print(f"Sending model to device {device} before DDP")
-    model.to(device)
     if args.distributed:
         if args.debug:
             print('Using DistributedDataParallel')
