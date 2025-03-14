@@ -15,7 +15,7 @@ echo "Setting CUDA_VISIBLE_DEVICES=$GPU_ID"
 # Load modules
 module load cuda/11.8
 source ~/.bashrc
-conda activate vim
+conda activate mamba
 
 torchrun \
     --nnodes=1 \
