@@ -17,7 +17,7 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate vim
 
-torchrun
+torchrun \
     --nnodes=1 \
     --nproc-per-node=1 \
     main.py \
