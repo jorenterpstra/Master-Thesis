@@ -628,25 +628,9 @@ def vim_base_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_middle_cls
 
 # tiny variant that has less parameters to work better with a smaller dataset
 @register_model
-def vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2_small(pretrained=False, **kwargs):
+def vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2(pretrained=False, **kwargs):
     model = VisionMamba(
-        patch_size=16, 
-        embed_dim=96,  # Reduced from 192 to reduce model size
-        depth=24,     
-        rms_norm=True, 
-        residual_in_fp32=True,
-        fused_add_norm=True,
-        final_pool_type='mean',
-        if_abs_pos_embed=True,
-        if_rope=False,
-        if_rope_residual=False,
-        drop_rate=0.1,         # Added dropout to prevent overfitting
-        drop_path_rate=0.05,   # Reduced from default 0.1
-        bimamba_type="v2",
-        if_cls_token=True,
-        if_divide_out=True,
-        use_middle_cls_token=True,
-        **kwargs)
+        patch_size=16, embed_dim=96, depth=24, rms_norm=True, residual_in_fp32=True, fused_add_norm=True, final_pool_type='mean', if_abs_pos_embed=True, if_rope=False, if_rope_residual=False, bimamba_type="v2", if_cls_token=True, if_divide_out=True, use_middle_cls_token=True, **kwargs)
     model.default_cfg = _cfg()
     if pretrained:
         checkpoint = torch.hub.load_state_dict_from_url(
