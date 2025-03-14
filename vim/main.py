@@ -391,13 +391,14 @@ def main(args):
             resume='')
 
     model_without_ddp = model
+    print(f"Sending model to device {device} before DDP")
+    model.to(device)
     if args.distributed:
         if args.debug:
             print('Using DistributedDataParallel')
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    model.to(device)
     print('number of params:', n_parameters)
 
     if not args.unscale_lr:
