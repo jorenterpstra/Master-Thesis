@@ -11,6 +11,7 @@ class PatchEmbedCustom(nn.Module):
     """
     def __init__(self, img_size=224, patch_size=16, stride=16, in_chans=3, embed_dim=768, 
                  norm_layer=None, flatten=True, patch_order=None):
+        assert type(patch_order) in [type(None), list] or patch_order == "dynamic", "Patch order must be 'dynamic', a list or None"
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
@@ -19,16 +20,13 @@ class PatchEmbedCustom(nn.Module):
         self.grid_size = ((img_size[0] - patch_size[0]) // stride + 1, (img_size[1] - patch_size[1]) // stride + 1)
         self.num_patches = self.grid_size[0] * self.grid_size[1]
         self.flatten = flatten
-        self.patch_order = torch.tensor(patch_order, dtype=torch.long) if patch_order is not None else torch.arange(self.num_patches)
+        if isinstance(patch_order, list):
+            self.patch_order = torch.tensor(patch_order, dtype=torch.long)
+        elif patch_order is None:
+            self.patch_order = torch.arange(self.num_patches)
+        else:
+            self.patch_order = patch_order
 
-        self.order_predictor = nn.Sequential(
-            nn.Conv2d(in_chans, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(64, self.num_patches, kernel_size=3, stride=1, padding=1),
-            nn.AdaptiveAvgPool2d((1, self.num_patches)),
-            nn.Flatten(),
-            nn.Softmax(dim=-1)
-        )
         with torch.no_grad():
             self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride)
             self.proj.weight.fill_(1.0)
@@ -52,6 +50,11 @@ class PatchEmbedCustom(nn.Module):
         y = torch.gather(x, 1, self.patch_order.unsqueeze(0).unsqueeze(-1).expand(B, -1, x.size(-1)))
         
         return x, y
+    
+    def dynamic_ordering(self, x):
+        # Use the backbone and RPN of Faster R-CNN to predict the order of patches in an image batch
+        pass #TODO implement dynamic ordering
+
     
 def test_patch_embed():
     # Define custom patch order

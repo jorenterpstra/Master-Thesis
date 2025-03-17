@@ -11,6 +11,8 @@ GPU_ID=$(nvidia-smi --query-gpu=memory.used,index --format=csv,noheader,nounits 
 # Export GPU selection BEFORE loading modules
 export CUDA_VISIBLE_DEVICES=$GPU_ID
 echo "Setting CUDA_VISIBLE_DEVICES=$GPU_ID"
+export MASTER_ADDR=$(scontrol show hostname ${SLURM_NODELIST} | head -n 1)
+echo "Setting MASTER_ADDR=$MASTER_ADDR"
 
 # Load modules
 module load cuda/11.8
@@ -19,7 +21,6 @@ conda activate mamba
 
 torchrun \
     --nnodes=1 \
-    --nproc-per-node=1 \
     main.py \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 128 \
