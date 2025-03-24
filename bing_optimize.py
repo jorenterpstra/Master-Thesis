@@ -94,9 +94,13 @@ def generate_bing_heatmap(image, saliency, num_detections, normalize=True):
         
     return heatmap
 
-def fully_vectorized_heatmap(img, saliencyMap, max_detections):
+def fully_vectorized_heatmap(image, saliency, max_detections):
     """Fully vectorized heatmap generation without explicit loops"""
-    height, width = img.shape[:2]
+    with suppress_stdout():
+        (success, saliencyMap) = saliency.computeSaliency(image)
+    if not success:
+        return np.zeros(image.shape[:2], dtype=np.float32)
+    height, width = image.shape[:2]
     num_boxes = min(saliencyMap.shape[0], max_detections)
     
     # Extract all boxes at once
@@ -197,6 +201,8 @@ def main():
     # Track metrics for each detection count
     iou_scores = {count: [] for count in detection_counts}
     mse_scores = {count: [] for count in detection_counts}
+    iou_v_scores = {count: [] for count in detection_counts}
+    mse_v_scores = {count: [] for count in detection_counts}
     
     # Process images
     for idx in tqdm(indices, desc="Processing images"):
@@ -213,22 +219,24 @@ def main():
         
         # Generate ground truth heatmap from bounding boxes
         gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
-        with suppress_stdout():
-            (success, saliencyMap) = saliency.computeSaliency(image_cv)
-        if not success:
-            continue
+
         # Try different detection counts
         for count in detection_counts:
             # Generate BING heatmap
-            bing_heatmap = generate_bing_heatmap(image_cv, saliencyMap, count)
+            bing_heatmap = generate_bing_heatmap(image_cv, saliency, count)
+            bing_heatmap_fully_vectorized = fully_vectorized_heatmap(image_cv, saliency, count)
             
             # Calculate metrics
             iou = calculate_iou(gt_heatmap, bing_heatmap)
             mse = calculate_mse(gt_heatmap, bing_heatmap)
+            iou_v = calculate_iou(gt_heatmap, bing_heatmap_fully_vectorized)
+            mse_v = calculate_mse(gt_heatmap, bing_heatmap_fully_vectorized)
             
             # Store metrics
             iou_scores[count].append(iou)
             mse_scores[count].append(mse)
+            iou_v_scores[count].append(iou_v)
+            mse_v_scores[count].append(mse_v)
             
         # Visualize results for the first few images
         if len(iou_scores[detection_counts[0]]) <= 5:
@@ -273,13 +281,19 @@ def main():
     # Calculate average metrics
     avg_iou = {count: np.mean(scores) for count, scores in iou_scores.items()}
     avg_mse = {count: np.mean(scores) for count, scores in mse_scores.items()}
+    avg_iou_v = {count: np.mean(scores) for count, scores in iou_v_scores.items()}
+    avg_mse_v = {count: np.mean(scores) for count, scores in mse_v_scores.items()}
     
     # Find the best detection count
     best_iou_count = max(avg_iou.items(), key=lambda x: x[1])[0]
     best_mse_count = min(avg_mse.items(), key=lambda x: x[1])[0]
+    best_iou_v_count = max(avg_iou_v.items(), key=lambda x: x[1])[0]
+    best_mse_v_count = min(avg_mse_v.items(), key=lambda x: x[1])[0]
     
     print(f"Best detection count based on IoU: {best_iou_count} (IoU: {avg_iou[best_iou_count]:.3f})")
     print(f"Best detection count based on MSE: {best_mse_count} (MSE: {avg_mse[best_mse_count]:.3f})")
+    print(f"Best detection count based on IoU (vectorized): {best_iou_v_count} (IoU: {avg_iou_v[best_iou_v_count]:.3f})")
+    print(f"Best detection count based on MSE (vectorized): {best_mse_v_count} (MSE: {avg_mse_v[best_mse_v_count]:.3f})")
     
     # Plot results
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
