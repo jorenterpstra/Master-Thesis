@@ -162,7 +162,7 @@ def main():
     
     # Parameters
     num_images = 20  # Number of images to evaluate
-    detection_counts = [10, 50, 100, 200, 300, 400, 500, 750, 1000]  # Different detection counts to try
+    detection_counts = [10, 50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000]  # Different detection counts to try
     
     # Initialize the BING objectness saliency detector
     saliency = cv2.saliency.ObjectnessBING_create()
