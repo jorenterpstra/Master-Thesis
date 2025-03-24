@@ -197,7 +197,7 @@ def main():
             image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         
         # Generate ground truth heatmap from bounding boxes
-        gt_heatmap = fully_vectorized_heatmap(image_np.shape, bboxes)
+        gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
         
         # Try different detection counts
         for count in detection_counts:
