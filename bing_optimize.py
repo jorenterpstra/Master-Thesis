@@ -81,6 +81,10 @@ def generate_bing_heatmap(image, saliency, num_detections, normalize=True):
 
 def fully_vectorized_heatmap(img, saliencyMap, max_detections):
     """Fully vectorized heatmap generation without explicit loops"""
+    (success, saliencyMap) = saliency.computeSaliency(img)
+    if not success:
+        return np.zeros(img.shape[:2], dtype=np.float32)
+    
     height, width = img.shape[:2]
     num_boxes = min(saliencyMap.shape[0], max_detections)
     
@@ -161,7 +165,7 @@ def main():
     cv2.setLogLevel(3)
     
     # Parameters
-    num_images = 20  # Number of images to evaluate
+    num_images = 50  # Number of images to evaluate
     detection_counts = [10, 50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000]  # Different detection counts to try
     
     # Initialize the BING objectness saliency detector
