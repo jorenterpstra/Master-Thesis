@@ -79,6 +79,41 @@ def generate_bing_heatmap(image, saliency, num_detections, normalize=True):
         
     return heatmap
 
+def fully_vectorized_heatmap(img, saliencyMap, max_detections):
+    """Fully vectorized heatmap generation without explicit loops"""
+    height, width = img.shape[:2]
+    num_boxes = min(saliencyMap.shape[0], max_detections)
+    
+    # Extract all boxes at once
+    boxes = saliencyMap[:num_boxes].reshape(num_boxes, 4).astype(np.int32)
+    
+    # Clip to image boundaries
+    boxes[:, 0] = np.clip(boxes[:, 0], 0, width - 1)  # startX
+    boxes[:, 1] = np.clip(boxes[:, 1], 0, height - 1)  # startY
+    boxes[:, 2] = np.clip(boxes[:, 2], boxes[:, 0] + 1, width)  # endX
+    boxes[:, 3] = np.clip(boxes[:, 3], boxes[:, 1] + 1, height)  # endY
+    
+    # Calculate weights
+    weights = 1.0 - (np.arange(num_boxes) / max_detections)
+    
+    # Create 3D mask array (num_boxes × height × width)
+    masks = np.zeros((num_boxes, height, width), dtype=np.float32)
+    
+    # Create coordinate arrays once
+    y_range = np.arange(height)
+    x_range = np.arange(width)
+    
+    # Use broadcasting to create masks for all boxes at once
+    Y, X = np.meshgrid(y_range, x_range, indexing='ij')
+    
+    # This is still a loop but much more efficient
+    for i in range(num_boxes):
+        masks[i] = ((X >= boxes[i, 0]) & (X < boxes[i, 2]) & 
+                    (Y >= boxes[i, 1]) & (Y < boxes[i, 3]))
+    
+    # Apply weights and sum
+    return np.sum(masks * weights[:, np.newaxis, np.newaxis], axis=0)
+
 def calculate_iou(heatmap1, heatmap2, threshold=0.5):
     """
     Calculate Intersection over Union between two heatmaps
@@ -160,12 +195,12 @@ def main():
             image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         
         # Generate ground truth heatmap from bounding boxes
-        gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
+        gt_heatmap = fully_vectorized_heatmap(image_np.shape, bboxes)
         
         # Try different detection counts
         for count in detection_counts:
             # Generate BING heatmap
-            bing_heatmap = generate_bing_heatmap(image_cv, saliency, count)
+            bing_heatmap = fully_vectorized_heatmap(image_cv, saliency, count)
             
             # Calculate metrics
             iou = calculate_iou(gt_heatmap, bing_heatmap)
