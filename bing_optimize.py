@@ -134,7 +134,7 @@ def main():
     # Create dataset
     dataset = ImageNetPatchRankLoader(
         root_dir=data_root,
-        split='val',
+        split='train',
         transform=None,  # We need the original untransformed images
         return_boxes=True  # Get bounding boxes as well
     )
