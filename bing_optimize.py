@@ -214,7 +214,7 @@ def main():
         # Generate ground truth heatmap from bounding boxes
         gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
         with suppress_stdout():
-            (success, saliencyMap) = saliency.computeSalsiency(image_cv)
+            (success, saliencyMap) = saliency.computeSaliency(image_cv)
         if not success:
             continue
         # Try different detection counts
