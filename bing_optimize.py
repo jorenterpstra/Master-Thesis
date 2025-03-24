@@ -157,6 +157,8 @@ def main():
     model_path = "/storage/scratch/6403840/data/BING_models"
     output_dir = Path("/storage/scratch/6403840/data/bing_optimization")
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    cv2.setLogLevel(cv2.LOG_LEVEL_WARNING)
     
     # Parameters
     num_images = 20  # Number of images to evaluate
