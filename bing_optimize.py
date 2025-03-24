@@ -81,10 +81,6 @@ def generate_bing_heatmap(image, saliency, num_detections, normalize=True):
 
 def fully_vectorized_heatmap(img, saliencyMap, max_detections):
     """Fully vectorized heatmap generation without explicit loops"""
-    (success, saliencyMap) = saliency.computeSaliency(img)
-    if not success:
-        return np.zeros(img.shape[:2], dtype=np.float32)
-    
     height, width = img.shape[:2]
     num_boxes = min(saliencyMap.shape[0], max_detections)
     
@@ -202,11 +198,13 @@ def main():
         
         # Generate ground truth heatmap from bounding boxes
         gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
-        
+        (success, saliencyMap) = saliency.computeSaliency(image_cv)
+        if not success:
+            continue
         # Try different detection counts
         for count in detection_counts:
             # Generate BING heatmap
-            bing_heatmap = fully_vectorized_heatmap(image_cv, saliency, count)
+            bing_heatmap = fully_vectorized_heatmap(image_cv, saliencyMap, count)
             
             # Calculate metrics
             iou = calculate_iou(gt_heatmap, bing_heatmap)
