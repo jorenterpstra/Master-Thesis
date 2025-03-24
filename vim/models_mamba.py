@@ -14,6 +14,8 @@ from timm.models.layers import DropPath, to_2tuple
 from timm.models.vision_transformer import _load_weights
 
 import math
+import cv2
+import numpy as np
 
 from collections import namedtuple
 
@@ -232,6 +234,9 @@ def segm_init_weights(m):
         nn.init.zeros_(m.bias)
         nn.init.ones_(m.weight)
 
+def run_bing_detection(model, imgs):
+    pass
+
 
 class VisionMamba(nn.Module):
     def __init__(self, 
@@ -307,6 +312,7 @@ class VisionMamba(nn.Module):
                 # self.num_tokens = 1
             
         if if_abs_pos_embed:
+            # create the position embedding table for the image patches
             self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + self.num_tokens, self.embed_dim))
             self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -360,6 +366,7 @@ class VisionMamba(nn.Module):
         self.patch_embed.apply(segm_init_weights)
         self.head.apply(segm_init_weights)
         if if_abs_pos_embed:
+            # populate the position embedding table
             trunc_normal_(self.pos_embed, std=.02)
         if if_cls_token:
             if use_double_cls_token:
@@ -430,6 +437,7 @@ class VisionMamba(nn.Module):
             #             )
             x = x + self.pos_embed
             x = self.pos_drop(x)
+
 
         if if_random_token_rank:
 

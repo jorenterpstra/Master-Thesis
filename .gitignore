@@ -17,3 +17,4 @@ causal-conv1d/
 work_dirs/
 __pycache__/
 test_runs/*
+log.txt
