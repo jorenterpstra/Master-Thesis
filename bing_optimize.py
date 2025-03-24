@@ -7,6 +7,20 @@ from PIL import Image
 import torch
 from patch.dataloader import ImageNetPatchRankLoader
 from tqdm import tqdm
+import sys
+import os
+from contextlib import contextmanager
+
+@contextmanager
+def suppress_stdout():
+    """Context manager to suppress stdout output"""
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
 
 def generate_gt_heatmap(image_shape, bboxes, normalize=True):
     """
@@ -51,7 +65,8 @@ def generate_bing_heatmap(image, saliency, num_detections, normalize=True):
     Returns:
         heatmap: numpy array of shape (height, width)
     """
-    (success, saliencyMap) = saliency.computeSaliency(image)
+    with suppress_stdout():
+        (success, saliencyMap) = saliency.computeSaliency(image)
     if not success:
         return np.zeros(image.shape[:2], dtype=np.float32)
     
@@ -158,7 +173,7 @@ def main():
     output_dir = Path("/storage/scratch/6403840/data/bing_optimization")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    cv2.setLogLevel(3)
+    cv2.setLogLevel(2)
     
     # Parameters
     num_images = 50  # Number of images to evaluate
@@ -198,7 +213,8 @@ def main():
         
         # Generate ground truth heatmap from bounding boxes
         gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
-        (success, saliencyMap) = saliency.computeSaliency(image_cv)
+        with suppress_stdout():
+            (success, saliencyMap) = saliency.computeSaliency(image_cv)
         if not success:
             continue
         # Try different detection counts
