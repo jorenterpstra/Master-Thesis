@@ -214,13 +214,13 @@ def main():
         # Generate ground truth heatmap from bounding boxes
         gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
         with suppress_stdout():
-            (success, saliencyMap) = saliency.computeSaliency(image_cv)
+            (success, saliencyMap) = saliency.computeSalsiency(image_cv)
         if not success:
             continue
         # Try different detection counts
         for count in detection_counts:
             # Generate BING heatmap
-            bing_heatmap = fully_vectorized_heatmap(image_cv, saliencyMap, count)
+            bing_heatmap = generate_bing_heatmap(image_cv, saliencyMap, count)
             
             # Calculate metrics
             iou = calculate_iou(gt_heatmap, bing_heatmap)
