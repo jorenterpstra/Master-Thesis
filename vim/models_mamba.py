@@ -311,7 +311,7 @@ class VisionMamba(nn.Module):
                 self.cls_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
                 # self.num_tokens = 1
             
-        if if_abs_pos_embed:
+        if if_abs_pos_embed: # position embedding table is created here
             # create the position embedding table for the image patches
             self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + self.num_tokens, self.embed_dim))
             self.pos_drop = nn.Dropout(p=drop_rate)
@@ -399,7 +399,7 @@ class VisionMamba(nn.Module):
     def load_pretrained(self, checkpoint_path, prefix=""):
         _load_weights(self, checkpoint_path, prefix)
 
-    def forward_features(self, x, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False):
+    def forward_features(self, x, rankings=None, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False, custom_rank=None):
         # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
         # with slight modifications to add the dist_token
         x = self.patch_embed(x)
@@ -435,9 +435,22 @@ class VisionMamba(nn.Module):
             #     pos_embed = interpolate_pos_embed_online(
             #                 self.pos_embed, self.patch_embed.grid_size, new_grid_size,0
             #             )
-            x = x + self.pos_embed
+            x = x + self.pos_embed # position embedding is added here
             x = self.pos_drop(x)
 
+        if rankings is not None and isinstance(rankings, (list, Tensor)):
+            # reshuffle the tokens to a global order, can be done in one batch so wouldn't be too computationally intensive
+            # example shown in custom_patch_embed.py
+            # need to think of a smart way to do this to keep processing limitations to a max
+            # maybe do the shuffling in the dataloader? Would mean that position embedding will have to be added earlier I suppose
+            # otherwise maybe get one batch ready while another batch is training? Don't know how that would work without dataloader
+            pass
+        elif rankings is 'local':
+            # same for the above shuffling, except that every image has to get a custom order
+            # use original x1 to obtain a sampling order
+            # maybe get this from a custom dataloader that gives for each image the RGB data, as well as a ranking for that image
+            # then you'd only have to swap the patches image per image at this step, but then you'd have to do it very smart
+            pass
 
         if if_random_token_rank:
 
@@ -559,8 +572,8 @@ class VisionMamba(nn.Module):
         else:
             raise NotImplementedError
 
-    def forward(self, x, return_features=False, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False):
-        x = self.forward_features(x, inference_params, if_random_cls_token_position=if_random_cls_token_position, if_random_token_rank=if_random_token_rank)
+    def forward(self, x, return_features=False, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False, custom_rank=None):
+        x = self.forward_features(x, inference_params, if_random_cls_token_position=if_random_cls_token_position, if_random_token_rank=if_random_token_rank, custom_rank=custom_rank)
         if return_features:
             return x
         x = self.head(x)
