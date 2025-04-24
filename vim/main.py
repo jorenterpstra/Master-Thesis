@@ -550,16 +550,35 @@ def main(args):
                         'scaler': loss_scaler.state_dict() if loss_scaler != 'none' else loss_scaler,
                         'args': args,
                     }, checkpoint_path)
+                
+                # Save predictions and targets for statistical analysis
                 predictions = test_stats['predictions']
                 targets = test_stats['targets']
-                # Save predictions and targets to a CSV file
-                output_csv_path = output_dir / 'predictions_targets.csv'
+                
+                # Save everything to a single CSV file with full prediction info
+                output_csv_path = output_dir / 'best_model_results.csv'
+                print(f"Saving best model results to {output_csv_path}")
+                
                 with open(output_csv_path, 'w') as f:
-                    f.write('Prediction,Target\n')
-                    for pred, target in zip(predictions, targets):
-                        f.write(f'{pred},{target}\n')
-            
-            
+                    # Write header with metadata
+                    f.write(f"# Best model results from epoch {epoch}\n")
+                    f.write(f"# Validation accuracy: {test_stats['acc1']:.4f}%\n")
+                    f.write(f"# Model: {args.model}\n")
+                    f.write(f"# Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("index,prediction,target,correct\n")
+                    
+                    # Write all prediction data 
+                    for i, (pred, target) in enumerate(zip(predictions, targets)):
+                        correct = 1 if pred.item() == target.item() else 0
+                        f.write(f"{i},{pred.item()},{target.item()},{correct}\n")
+                
+                print(f"Saved best model results to {output_csv_path}")
+                
+                # Optionally keep the numpy files as backup
+                if False:  # Set to True if you want numpy backups
+                    np.save(output_dir / 'best_predictions.npy', predictions.numpy())
+                    np.save(output_dir / 'best_targets.npy', targets.numpy())
+
         print(f'Max accuracy: {max_accuracy:.2f}%')
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
