@@ -237,9 +237,51 @@ def process_class_folder(class_folder, output_dir, patch_size, stride, training_
 def process_imagenet_dataset(data_dir, output_dir, patch_size, stride, training_path, num_bboxes):
     """
     Process the ImageNet-style dataset: identify all class folders and process each one.
+    Automatically detects and handles standard ImageNet structure with train/val folders.
     
     Args:
-        data_dir (str): Root directory of the ImageNet-style dataset with class folders
+        data_dir (str): Root directory of the ImageNet dataset
+        output_dir (str): Directory to save the output CSV files
+        patch_size (int): Patch size
+        stride (int): Stride
+        training_path (str): Path for BING training data
+        num_bboxes (int): Maximum number of bounding boxes to consider
+    """
+    # Check if this is an ImageNet root folder with train/val structure
+    train_dir = os.path.join(data_dir, 'train')
+    val_dir = os.path.join(data_dir, 'val')
+    
+    has_train = os.path.isdir(train_dir)
+    has_val = os.path.isdir(val_dir)
+    
+    if has_train or has_val:
+        print(f"Detected ImageNet folder structure with {'train' if has_train else ''}{' and ' if has_train and has_val else ''}{'val' if has_val else ''}")
+        
+        # Process train directory if it exists
+        if has_train:
+            train_output_dir = os.path.join(output_dir, 'train')
+            os.makedirs(train_output_dir, exist_ok=True)
+            print(f"Processing train directory: {train_dir}")
+            process_imagenet_subset(train_dir, train_output_dir, patch_size, stride, training_path, num_bboxes)
+        
+        # Process val directory if it exists
+        if has_val:
+            val_output_dir = os.path.join(output_dir, 'val')
+            os.makedirs(val_output_dir, exist_ok=True)
+            print(f"Processing val directory: {val_dir}")
+            process_imagenet_subset(val_dir, val_output_dir, patch_size, stride, training_path, num_bboxes)
+    else:
+        # Assume we're already looking at a directory with class folders
+        print(f"Processing directory with class folders: {data_dir}")
+        process_imagenet_subset(data_dir, output_dir, patch_size, stride, training_path, num_bboxes)
+
+def process_imagenet_subset(data_dir, output_dir, patch_size, stride, training_path, num_bboxes):
+    """
+    Process a subset of the ImageNet dataset (train or val).
+    This contains the original implementation to handle the class folders.
+    
+    Args:
+        data_dir (str): Directory containing class folders
         output_dir (str): Directory to save the output CSV files
         patch_size (int): Patch size
         stride (int): Stride

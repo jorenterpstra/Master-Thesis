@@ -193,6 +193,172 @@ def resize_bbox(bbox, original_size, target_size=(224, 224)):
         h * scale_y
     ]
 
+def get_balanced_sample_indices(dataset, num_images):
+    """
+    Get indices for a class-balanced sample of images
+    
+    Args:
+        dataset: ImageNetPatchRankLoader dataset
+        num_images: target number of images to sample
+    
+    Returns:
+        List of indices for a balanced sample
+    """
+    # Get all image indices grouped by class
+    class_to_indices = {}
+    for idx in range(len(dataset)):
+        _, class_id, _ = dataset[idx]
+        if class_id not in class_to_indices:
+            class_to_indices[class_id] = []
+        class_to_indices[class_id].append(idx)
+    
+    # Calculate how many images to sample from each class
+    num_classes = len(class_to_indices)
+    images_per_class = max(1, num_images // num_classes)
+    
+    # Sample from each class
+    balanced_indices = []
+    for class_indices in class_to_indices.values():
+        # Take either images_per_class or all available if less
+        sample_size = min(images_per_class, len(class_indices))
+        class_sample = np.random.choice(class_indices, sample_size, replace=False)
+        balanced_indices.extend(class_sample)
+    
+    # If we need more images to reach target, sample randomly from remaining
+    if len(balanced_indices) < num_images:
+        remaining = num_images - len(balanced_indices)
+        # Get all indices not already selected
+        all_indices = set(range(len(dataset)))
+        remaining_indices = list(all_indices - set(balanced_indices))
+        if remaining_indices:
+            extra_sample = np.random.choice(remaining_indices, 
+                                           min(remaining, len(remaining_indices)), 
+                                           replace=False)
+            balanced_indices.extend(extra_sample)
+    
+    # If we have more than needed, subsample
+    if len(balanced_indices) > num_images:
+        balanced_indices = np.random.choice(balanced_indices, num_images, replace=False)
+    
+    return balanced_indices
+
+def optimize_detection_count(dataset, indices, saliency, min_count=10, max_count=2000):
+    """
+    Use binary search to find optimal detection count more efficiently
+    
+    Args:
+        dataset: ImageNetPatchRankLoader dataset
+        indices: indices of images to process
+        saliency: BING saliency detector
+        min_count: minimum number of detections to consider
+        max_count: maximum number of detections to consider
+    
+    Returns:
+        optimal_count: optimal number of detections
+        metrics: dictionary of metrics for the optimal count
+    """
+    # Start with a coarse grid search to determine promising regions
+    grid_points = [10, 50, 200, 500, 1000, 2000]
+    grid_points = [p for p in grid_points if min_count <= p <= max_count]
+    
+    iou_scores = {count: [] for count in grid_points}
+    
+    # Process images with grid points
+    for idx in tqdm(indices[:20], desc="Initial grid search"):  # Use subset for initial search
+        original_image, _, original_bboxes = dataset[idx]
+        
+        # Preprocessing steps (same as before)
+        original_size = (original_image.width, original_image.height)
+        image = original_image.resize((224, 224), Image.LANCZOS)
+        bboxes = [resize_bbox(bbox, original_size) for bbox in original_bboxes]
+        image_np = np.array(image)
+        image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        gt_heatmap = generate_gt_heatmap((224, 224), bboxes)
+        
+        # Evaluate grid points
+        for count in grid_points:
+            bing_heatmap = generate_bing_heatmap(image_cv, saliency, count)
+            iou = calculate_iou(gt_heatmap, bing_heatmap)
+            iou_scores[count].append(iou)
+    
+    # Find best region based on average IoU
+    avg_iou = {count: np.mean(scores) for count, scores in iou_scores.items()}
+    sorted_counts = sorted(grid_points, key=lambda x: avg_iou[x], reverse=True)
+    
+    # Define search bounds based on grid results
+    if len(sorted_counts) >= 3:
+        # Use top 3 points to define region
+        top_points = sorted_counts[:3]
+        low_bound = max(min_count, min(top_points) // 2)
+        high_bound = min(max_count, max(top_points) * 2)
+    else:
+        low_bound, high_bound = min_count, max_count
+    
+    # Binary search for optimal count
+    search_precision = 50  # Minimum gap to continue searching
+    while high_bound - low_bound > search_precision:
+        mid1 = low_bound + (high_bound - low_bound) // 3
+        mid2 = high_bound - (high_bound - low_bound) // 3
+        
+        # Evaluate at mid points
+        mid1_iou, mid2_iou = [], []
+        
+        for idx in tqdm(indices, desc=f"Binary search [{low_bound}-{high_bound}]"):
+            original_image, _, original_bboxes = dataset[idx]
+            # Preprocessing (same as before)
+            original_size = (original_image.width, original_image.height)
+            image = original_image.resize((224, 224), Image.LANCZOS)
+            bboxes = [resize_bbox(bbox, original_size) for bbox in original_bboxes]
+            image_np = np.array(image)
+            image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+            gt_heatmap = generate_gt_heatmap((224, 224), bboxes)
+            
+            # Test mid points
+            bing_heatmap1 = generate_bing_heatmap(image_cv, saliency, mid1)
+            iou1 = calculate_iou(gt_heatmap, bing_heatmap1)
+            mid1_iou.append(iou1)
+            
+            bing_heatmap2 = generate_bing_heatmap(image_cv, saliency, mid2)
+            iou2 = calculate_iou(gt_heatmap, bing_heatmap2)
+            mid2_iou.append(iou2)
+        
+        # Update search bounds
+        if np.mean(mid1_iou) > np.mean(mid2_iou):
+            high_bound = mid2
+        else:
+            low_bound = mid1
+    
+    # Final evaluation with more images at optimal point
+    optimal_count = (low_bound + high_bound) // 2
+    
+    # Full evaluation at optimal point
+    final_iou = []
+    final_mse = []
+    
+    for idx in tqdm(indices, desc=f"Final evaluation at count={optimal_count}"):
+        original_image, _, original_bboxes = dataset[idx]
+        # Preprocessing (same as before)
+        original_size = (original_image.width, original_image.height)
+        image = original_image.resize((224, 224), Image.LANCZOS)
+        bboxes = [resize_bbox(bbox, original_size) for bbox in original_bboxes]
+        image_np = np.array(image)
+        image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        gt_heatmap = generate_gt_heatmap((224, 224), bboxes)
+        
+        bing_heatmap = generate_bing_heatmap(image_cv, saliency, optimal_count)
+        iou = calculate_iou(gt_heatmap, bing_heatmap)
+        mse = calculate_mse(gt_heatmap, bing_heatmap)
+        
+        final_iou.append(iou)
+        final_mse.append(mse)
+    
+    return optimal_count, {
+        'iou_mean': np.mean(final_iou),
+        'iou_std': np.std(final_iou),
+        'mse_mean': np.mean(final_mse),
+        'mse_std': np.std(final_mse)
+    }
+
 def main():
     # Paths configuration
     data_root = Path("/storage/scratch/6403840/data/imagenet-tiny")
@@ -204,7 +370,6 @@ def main():
     
     # Parameters
     num_images = 50  # Number of images to evaluate
-    detection_counts = [10, 50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000]  # Different detection counts to try
     
     # Initialize the BING objectness saliency detector
     saliency = cv2.saliency.ObjectnessBING_create()
@@ -218,153 +383,27 @@ def main():
         return_boxes=True  # Get bounding boxes as well
     )
     
-    # Randomly sample images
-    indices = np.random.choice(len(dataset), min(num_images, len(dataset)), replace=False)
+    # Get class-balanced sample
+    print("Selecting class-balanced sample of images...")
+    indices = get_balanced_sample_indices(dataset, num_images)
+    print(f"Selected {len(indices)} images across {len(set(dataset[idx][1] for idx in indices))} classes")
     
-    # Track metrics for each detection count
-    iou_scores = {count: [] for count in detection_counts}
-    mse_scores = {count: [] for count in detection_counts}
-    iou_v_scores = {count: [] for count in detection_counts}
-    mse_v_scores = {count: [] for count in detection_counts}
+    # Find optimal detection count
+    print("Starting adaptive optimization...")
+    optimal_count, metrics = optimize_detection_count(
+        dataset, indices, saliency, min_count=10, max_count=2000
+    )
     
-    # Process images
-    for idx in tqdm(indices, desc="Processing images"):
-        # Get image and bounding boxes
-        original_image, _, original_bboxes = dataset[idx]
-        
-        # Resize image to 224x224
-        original_size = (original_image.width, original_image.height)
-        image = original_image.resize((224, 224), Image.LANCZOS)
-        
-        # Resize bounding boxes to match new image dimensions
-        bboxes = [resize_bbox(bbox, original_size) for bbox in original_bboxes]
-        
-        # Convert PIL Image to OpenCV format
-        image_np = np.array(image)
-        if len(image_np.shape) == 3 and image_np.shape[2] == 3:
-            image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-        else:
-            # Handle grayscale images
-            image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-        
-        # Generate ground truth heatmap from bounding boxes
-        gt_heatmap = generate_gt_heatmap((224, 224), bboxes)
+    print(f"\nResults:")
+    print(f"Optimal detection count: {optimal_count}")
+    print(f"IoU: {metrics['iou_mean']:.4f} ± {metrics['iou_std']:.4f}")
+    print(f"MSE: {metrics['mse_mean']:.4f} ± {metrics['mse_std']:.4f}")
 
-        # Try different detection counts
-        for count in detection_counts:
-            # Generate BING heatmap
-            bing_heatmap = generate_bing_heatmap(image_cv, saliency, count)
-            bing_heatmap_fully_vectorized = fully_vectorized_heatmap(image_cv, saliency, count)
-            
-            # Calculate metrics
-            iou = calculate_iou(gt_heatmap, bing_heatmap)
-            mse = calculate_mse(gt_heatmap, bing_heatmap)
-            iou_v = calculate_iou(gt_heatmap, bing_heatmap_fully_vectorized)
-            mse_v = calculate_mse(gt_heatmap, bing_heatmap_fully_vectorized)
-            
-            # Store metrics
-            iou_scores[count].append(iou)
-            mse_scores[count].append(mse)
-            iou_v_scores[count].append(iou_v)
-            mse_v_scores[count].append(mse_v)
-            
-        # Visualize results for the first few images
-        if len(iou_scores[detection_counts[0]]) <= 5:
-            # Also include original vs resized comparison
-            fig, axes = plt.subplots(3, len(detection_counts) + 1, figsize=(16, 9))
-            
-            # Show original image
-            axes[0, 0].imshow(original_image)
-            axes[0, 0].set_title("Original Image")
-            axes[0, 0].axis('off')
-            
-            # Show resized image
-            axes[1, 0].imshow(image)
-            axes[1, 0].set_title("Resized to 224x224")
-            axes[1, 0].axis('off')
-            
-            # Show ground truth
-            axes[2, 0].imshow(gt_heatmap, cmap='jet')
-            axes[2, 0].set_title("Ground Truth")
-            axes[2, 0].axis('off')
-            
-            # Plot BING heatmaps with different detection counts
-            for i, count in enumerate(detection_counts, 1):
-                if i < len(detection_counts) + 1:
-                    bing_heatmap = generate_bing_heatmap(image_cv, saliency, count)
-                    
-                    # Create a colored overlay for visualization
-                    bing_colored = cv2.applyColorMap((bing_heatmap * 255).astype(np.uint8), cv2.COLORMAP_JET)
-                    bing_colored = cv2.cvtColor(bing_colored, cv2.COLOR_BGR2RGB)
-                    
-                    # Create a transparent overlay
-                    overlay = image_np.copy()
-                    alpha = 0.6
-                    cv2.addWeighted(bing_colored, alpha, overlay, 1 - alpha, 0, overlay)
-                    
-                    axes[0, i].imshow(overlay)
-                    axes[0, i].set_title(f"BING Overlay: {count}")
-                    axes[0, i].axis('off')
-                    
-                    axes[1, i].imshow(bing_heatmap, cmap='jet')
-                    axes[1, i].set_title(f"BING: {count}\nIoU: {iou_scores[count][-1]:.3f}, MSE: {mse_scores[count][-1]:.3f}")
-                    axes[1, i].axis('off')
-            
-            plt.tight_layout()
-            plt.savefig(output_dir / f"bing_comparison_image_{idx}.png")
-            plt.close(fig)
-    
-    # Calculate average metrics
-    avg_iou = {count: np.mean(scores) for count, scores in iou_scores.items()}
-    avg_mse = {count: np.mean(scores) for count, scores in mse_scores.items()}
-    avg_iou_v = {count: np.mean(scores) for count, scores in iou_v_scores.items()}
-    avg_mse_v = {count: np.mean(scores) for count, scores in mse_v_scores.items()}
-    
-    # Find the best detection count
-    best_iou_count = max(avg_iou.items(), key=lambda x: x[1])[0]
-    best_mse_count = min(avg_mse.items(), key=lambda x: x[1])[0]
-    best_iou_v_count = max(avg_iou_v.items(), key=lambda x: x[1])[0]
-    best_mse_v_count = min(avg_mse_v.items(), key=lambda x: x[1])[0]
-    
-    print(f"Best detection count based on IoU: {best_iou_count} (IoU: {avg_iou[best_iou_count]:.3f})")
-    print(f"Best detection count based on MSE: {best_mse_count} (MSE: {avg_mse[best_mse_count]:.3f})")
-    print(f"Best detection count based on IoU (vectorized): {best_iou_v_count} (IoU: {avg_iou_v[best_iou_v_count]:.3f})")
-    print(f"Best detection count based on MSE (vectorized): {best_mse_v_count} (MSE: {avg_mse_v[best_mse_v_count]:.3f})")
-    
-    # Plot results
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    
-    # IoU plot (higher is better)
-    ax1.plot(detection_counts, [avg_iou[count] for count in detection_counts], 'o-')
-    ax1.set_xlabel('Number of Detections')
-    ax1.set_ylabel('Average IoU')
-    ax1.set_title('IoU vs. Number of Detections')
-    ax1.grid(True)
-    ax1.axvline(x=best_iou_count, color='r', linestyle='--', label=f'Best: {best_iou_count}')
-    ax1.legend()
-    
-    # MSE plot (lower is better)
-    ax2.plot(detection_counts, [avg_mse[count] for count in detection_counts], 'o-')
-    ax2.set_xlabel('Number of Detections')
-    ax2.set_ylabel('Average MSE')
-    ax2.set_title('MSE vs. Number of Detections')
-    ax2.grid(True)
-    ax2.axvline(x=best_mse_count, color='r', linestyle='--', label=f'Best: {best_mse_count}')
-    ax2.legend()
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / "optimization_results.png")
-    plt.close(fig)
-    
-    # Save numerical results
+    # Save results to file
     with open(output_dir / "optimization_results.txt", "w") as f:
-        f.write("Detection Count, Average IoU, Average MSE\n")
-        for count in detection_counts:
-            f.write(f"{count}, {avg_iou[count]:.5f}, {avg_mse[count]:.5f}\n")
-        f.write(f"\nBest detection count based on IoU: {best_iou_count} (IoU: {avg_iou[best_iou_count]:.5f})\n")
-        f.write(f"Best detection count based on MSE: {best_mse_count} (MSE: {avg_mse[best_mse_count]:.5f})\n")
-    
-    print(f"Results saved to {output_dir}")
+        f.write(f"Optimal detection count: {optimal_count}\n")
+        f.write(f"IoU: {metrics['iou_mean']:.4f} ± {metrics['iou_std']:.4f}\n")
+        f.write(f"MSE: {metrics['mse_mean']:.4f} ± {metrics['mse_std']:.4f}\n")
 
 if __name__ == "__main__":
     main()
