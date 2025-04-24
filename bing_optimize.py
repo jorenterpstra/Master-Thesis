@@ -170,6 +170,29 @@ def calculate_mse(heatmap1, heatmap2):
     """
     return np.mean((heatmap1 - heatmap2) ** 2)
 
+def resize_bbox(bbox, original_size, target_size=(224, 224)):
+    """
+    Resize a bounding box from original image dimensions to target dimensions
+    
+    Args:
+        bbox: [x, y, w, h] bounding box
+        original_size: (width, height) of original image
+        target_size: (width, height) of target image
+        
+    Returns:
+        resized_bbox: [x, y, w, h] scaled to target size
+    """
+    x, y, w, h = bbox
+    scale_x = target_size[0] / original_size[0]
+    scale_y = target_size[1] / original_size[1]
+    
+    return [
+        x * scale_x,
+        y * scale_y,
+        w * scale_x,
+        h * scale_y
+    ]
+
 def main():
     # Paths configuration
     data_root = Path("/storage/scratch/6403840/data/imagenet-tiny")
@@ -207,7 +230,14 @@ def main():
     # Process images
     for idx in tqdm(indices, desc="Processing images"):
         # Get image and bounding boxes
-        image, _, bboxes = dataset[idx]
+        original_image, _, original_bboxes = dataset[idx]
+        
+        # Resize image to 224x224
+        original_size = (original_image.width, original_image.height)
+        image = original_image.resize((224, 224), Image.LANCZOS)
+        
+        # Resize bounding boxes to match new image dimensions
+        bboxes = [resize_bbox(bbox, original_size) for bbox in original_bboxes]
         
         # Convert PIL Image to OpenCV format
         image_np = np.array(image)
@@ -218,7 +248,7 @@ def main():
             image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         
         # Generate ground truth heatmap from bounding boxes
-        gt_heatmap = generate_gt_heatmap(image_np.shape, bboxes)
+        gt_heatmap = generate_gt_heatmap((224, 224), bboxes)
 
         # Try different detection counts
         for count in detection_counts:
@@ -240,17 +270,23 @@ def main():
             
         # Visualize results for the first few images
         if len(iou_scores[detection_counts[0]]) <= 5:
-            # Create figure with multiple subplots
-            fig, axes = plt.subplots(2, len(detection_counts) + 1, figsize=(16, 6))
+            # Also include original vs resized comparison
+            fig, axes = plt.subplots(3, len(detection_counts) + 1, figsize=(16, 9))
             
-            # Plot ground truth
-            axes[0, 0].imshow(image)
+            # Show original image
+            axes[0, 0].imshow(original_image)
             axes[0, 0].set_title("Original Image")
             axes[0, 0].axis('off')
             
-            axes[1, 0].imshow(gt_heatmap, cmap='jet')
-            axes[1, 0].set_title("Ground Truth")
+            # Show resized image
+            axes[1, 0].imshow(image)
+            axes[1, 0].set_title("Resized to 224x224")
             axes[1, 0].axis('off')
+            
+            # Show ground truth
+            axes[2, 0].imshow(gt_heatmap, cmap='jet')
+            axes[2, 0].set_title("Ground Truth")
+            axes[2, 0].axis('off')
             
             # Plot BING heatmaps with different detection counts
             for i, count in enumerate(detection_counts, 1):
