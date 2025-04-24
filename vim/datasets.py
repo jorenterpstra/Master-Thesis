@@ -229,6 +229,7 @@ class RankedImageFolder(ImageFolder):
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
+    has_rankings = False  # Default to no rankings
 
     if args.data_set == 'CIFAR':
         dataset = datasets.CIFAR100(args.data_path, train=is_train, transform=transform)
@@ -247,9 +248,15 @@ def build_dataset(is_train, args):
         nb_classes = dataset.nb_classes
     elif args.data_set == 'IMNET_RANK':
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
-        rankings_dir = os.path.join(args.rankings_dir, 'train' if is_train else 'val')
+        rankings_dir = os.path.join(args.rankings_path, 'train' if is_train else 'val')
         dataset = RankedImageFolder(root, rankings_dir, transform=transform)
         nb_classes = 200
+        has_rankings = True  # RankedImageFolder always returns rankings
+    
+    # Set ranking flag in args for easy access across the codebase
+    if not hasattr(args, 'has_rankings'):
+        args.has_rankings = {}
+    args.has_rankings['train' if is_train else 'val'] = has_rankings
 
     return dataset, nb_classes
 

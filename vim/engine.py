@@ -33,23 +33,39 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
     
-    
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
-    # debug
-    # count = 0
-    for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
-        # count += 1
-        # if count > 20:
-        #     break
-        # print('Loading samples')
+
+    # Check if dataset includes custom rankings - directly use the flag from args
+    has_rankings = args.has_rankings.get('train', False)
+    
+    for batch in metric_logger.log_every(data_loader, print_freq, header):
+        # Unpack batch based on whether it includes rankings
+        if has_rankings:
+            samples, targets, rankings = batch
+        else:
+            samples, targets = batch
+            rankings = None
+            
         if args.debug:
-            print("------------- Samples are being loaded to device ",device)
+            print("------------- Samples are being loaded to device ", device)
+            
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
+        if rankings is not None:
+            rankings = rankings.to(device, non_blocking=True)
+            # Handle global ordering case
+            if rankings.dim() == 1:  # Shape [P]
+                B = samples.shape[0]  # Get batch size
+                rankings = rankings.unsqueeze(0).expand(B, -1)  # Expand to [B, P]
+                if args.debug:
+                    print(f"Expanded global ranking of shape {rankings.shape}")
+            
         if args.debug:
             print(f'------------- Samples are now loaded on device {samples.device}' )
             print(f"------------- The target is now loaded on device {targets.device}")
+            if rankings is not None:
+                print(f"------------- The rankings are now loaded on device {rankings.device}")
 
         original_targets = targets.clone()  # Save original targets for accuracy calculation
         
@@ -59,6 +75,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             # print('Samples mixed up')
         if args.cosub:
             samples = torch.cat((samples,samples),dim=0)
+            if rankings is not None:
+                # In case of cosub, also duplicate the rankings
+                rankings = torch.cat((rankings, rankings), dim=0)
         # print('Samples concatenated')
 
         if args.bce_loss:
@@ -66,8 +85,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         # print('BCE loss applied')
 
         with amp_autocast():
-            outputs = model(samples, if_random_cls_token_position=args.if_random_cls_token_position, if_random_token_rank=args.if_random_token_rank)
-            # outputs = model(samples)
+            outputs = model(
+                samples, 
+                if_random_cls_token_position=args.if_random_cls_token_position, 
+                if_random_token_rank=args.if_random_token_rank,
+                custom_rank=rankings
+            )
             
             if not args.cosub:
                 loss = criterion(samples, outputs, targets)
@@ -84,7 +107,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         loss_value = loss.item()
         if args.debug:
             print('Loss value calculated = ', loss_value)
-
+        
         # Calculate training accuracy (only when not using mixup or cosub to ensure valid metrics)
         if not args.cosub and mixup_fn is None:
             acc1, acc5 = accuracy(outputs, original_targets, topk=(1, 5))
@@ -144,7 +167,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
 
 @torch.no_grad()
-def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, output_dir=None):
+def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, output_dir=None, args=None):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -153,17 +176,29 @@ def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, o
     # switch to evaluation mode
     model.eval()
     
+    # Use the has_rankings flag directly from args
+    has_rankings = args.has_rankings.get('val', False) if args is not None and hasattr(args, 'has_rankings') else False
+    
     # Lists to store predictions and labels
     all_predictions = []
     all_targets = []
 
-    for images, target in metric_logger.log_every(data_loader, 10, header):
+    for batch in metric_logger.log_every(data_loader, 10, header):
+        # Unpack batch based on whether it includes rankings
+        if has_rankings:
+            images, target, rankings = batch
+        else:
+            images, target = batch
+            rankings = None
+            
         images = images.to(device, non_blocking=True)
         target = target.to(device, non_blocking=True)
+        if rankings is not None:
+            rankings = rankings.to(device, non_blocking=True)
 
         # compute output
         with amp_autocast():
-            output = model(images)
+            output = model(images, custom_rank=rankings)
             loss = criterion(output, target)
 
         acc1, acc5 = accuracy(output, target, topk=(1, 5))

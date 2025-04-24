@@ -399,7 +399,7 @@ class VisionMamba(nn.Module):
     def load_pretrained(self, checkpoint_path, prefix=""):
         _load_weights(self, checkpoint_path, prefix)
 
-    def forward_features(self, x, rankings=None, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False, custom_rank=None):
+    def forward_features(self, x, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False, custom_rank=None):
         # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
         # with slight modifications to add the dist_token
         x = self.patch_embed(x)
@@ -438,19 +438,30 @@ class VisionMamba(nn.Module):
             x = x + self.pos_embed # position embedding is added here
             x = self.pos_drop(x)
 
-        if rankings is not None and isinstance(rankings, (list, Tensor)):
-            # reshuffle the tokens to a global order, can be done in one batch so wouldn't be too computationally intensive
-            # example shown in custom_patch_embed.py
-            # need to think of a smart way to do this to keep processing limitations to a max
-            # maybe do the shuffling in the dataloader? Would mean that position embedding will have to be added earlier I suppose
-            # otherwise maybe get one batch ready while another batch is training? Don't know how that would work without dataloader
-            pass
-        elif rankings is 'local':
-            # same for the above shuffling, except that every image has to get a custom order
-            # use original x1 to obtain a sampling order
-            # maybe get this from a custom dataloader that gives for each image the RGB data, as well as a ranking for that image
-            # then you'd only have to swap the patches image per image at this step, but then you'd have to do it very smart
-            pass
+        if custom_rank is not None:
+            # x: [B, P+1, C], CLS token in middle
+            B, T, C = x.shape         # T = P + 1
+            P = T - 1
+            cls_pos = P // 2
+
+            # 1) split out patches before/after CLS
+            x_before = x[:, :cls_pos, :]      # [B, cls_pos, C]
+            x_cls    = x[:, cls_pos:cls_pos+1, :]  # [B, 1, C]
+            x_after  = x[:, cls_pos+1:, :]    # [B, P - cls_pos, C]
+
+            # 2) concat patches → [B, P, C]
+            x_patches = torch.cat([x_before, x_after], dim=1)
+
+            # 3) reorder via torch.gather using custom_rank [B, P]
+            idx = custom_rank.to(x.device).unsqueeze(-1).expand(-1, -1, C)
+            x_patches = torch.gather(x_patches, dim=1, index=idx)
+
+            # 4) reassemble with CLS in middle → [B, P+1, C]
+            x = torch.cat([
+                x_patches[:, :cls_pos, :],
+                x_cls,
+                x_patches[:, cls_pos:, :]
+            ], dim=1)
 
         if if_random_token_rank:
 
@@ -573,7 +584,13 @@ class VisionMamba(nn.Module):
             raise NotImplementedError
 
     def forward(self, x, return_features=False, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False, custom_rank=None):
-        x = self.forward_features(x, inference_params, if_random_cls_token_position=if_random_cls_token_position, if_random_token_rank=if_random_token_rank, custom_rank=custom_rank)
+        x = self.forward_features(
+            x, 
+            inference_params=inference_params, 
+            if_random_cls_token_position=if_random_cls_token_position, 
+            if_random_token_rank=if_random_token_rank, 
+            custom_rank=custom_rank
+        )
         if return_features:
             return x
         x = self.head(x)
