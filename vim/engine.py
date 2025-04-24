@@ -15,6 +15,8 @@ from timm.utils import accuracy, ModelEma
 
 from losses import DistillationLoss
 import utils
+import os
+import numpy as np
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
@@ -142,7 +144,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
 
 @torch.no_grad()
-def evaluate(data_loader, model, device, amp_autocast):
+def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, output_dir=None):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -150,6 +152,10 @@ def evaluate(data_loader, model, device, amp_autocast):
 
     # switch to evaluation mode
     model.eval()
+    
+    # Lists to store predictions and labels
+    all_predictions = []
+    all_targets = []
 
     for images, target in metric_logger.log_every(data_loader, 10, header):
         images = images.to(device, non_blocking=True)
@@ -161,14 +167,35 @@ def evaluate(data_loader, model, device, amp_autocast):
             loss = criterion(output, target)
 
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        
+        # Store predictions and true labels
+        predictions = output.argmax(dim=1).cpu()
+        all_predictions.append(predictions)
+        all_targets.append(target.cpu())
 
         batch_size = images.shape[0]
         metric_logger.update(loss=loss.item())
         metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
         metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
+    
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
-
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    
+    # Convert list of tensors to single tensors
+    all_predictions = torch.cat(all_predictions)
+    all_targets = torch.cat(all_targets)
+    
+    # Save predictions and targets if requested
+    if save_predictions and output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        np.save(os.path.join(output_dir, 'predictions.npy'), all_predictions.numpy())
+        np.save(os.path.join(output_dir, 'targets.npy'), all_targets.numpy())
+        print(f"Saved predictions and targets to {output_dir}")
+    
+    results = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    results['predictions'] = all_predictions
+    results['targets'] = all_targets
+    
+    return results
