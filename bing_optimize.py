@@ -369,7 +369,7 @@ def main():
     cv2.setLogLevel(2)
     
     # Parameters
-    num_images = 50  # Number of images to evaluate
+    num_images = 200  # Number of images to evaluate
     
     # Initialize the BING objectness saliency detector
     saliency = cv2.saliency.ObjectnessBING_create()
