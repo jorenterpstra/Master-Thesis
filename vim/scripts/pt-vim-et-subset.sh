@@ -24,7 +24,8 @@ export MKL_NUM_THREADS=2
 
 # Select the GPUs with the least memory usage
 
-python main.py \
+srun --ntasks=2 --nodes=1 --gpus-per-task=1 \
+    python main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 128 \
