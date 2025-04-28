@@ -24,12 +24,14 @@ conda activate mamba
 nvidia-smi
 
 # Select the GPUs with the least memory usage
-export CUDA_VISIBLE_DEVICES=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits | sort -n -k2 | head -n $SLURM_GPUS_PER_NODE | cut -d ' ' -f 1 | tr '\n' ',' | sed 's/,$//')
-echo "Using GPUs: $CUDA_VISIBLE_DEVICES"
 
 torchrun \
     --nnodes=1 \
     --nproc-per-node=2 \
+    --master_addr=$MASTER_ADDR \
+    --master_port=$MASTER_PORT \
+    --rdzv_backend=c10d \
+    --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
     main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
@@ -42,7 +44,7 @@ torchrun \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
-    --cutmix 0.0 \
+    --cutmix 0.0
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
 #     --batch-size 64 \
