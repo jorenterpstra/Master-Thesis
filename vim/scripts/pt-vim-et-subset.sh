@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=vim-extra-tiny
 #SBATCH --time=10-00:00:00
-#SBATCH --ntasks-per-node=2
-#SBATCH --gpus-per-node=2
+#SBATCH --ntasks-per-node=3
+#SBATCH --gpus-per-node=3
 #SBATCH --cpus-per-task=4
 
 # Setting up environment variables for distributed training
@@ -30,7 +30,7 @@ nvidia-smi
 
 torchrun \
     --nnodes=1 \
-    --nproc-per-node=2 \
+    --nproc-per-node=3 \
     --rdzv_id=${SLURM_JOB_ID} \
     main.py \
     --data-set IMNET \
