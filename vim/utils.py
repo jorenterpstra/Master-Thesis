@@ -314,12 +314,19 @@ def init_distributed_mode(args):
 
     try:
         if args.debug:
-            print(f"|-Barrier for process {args.rank} to GPU {args.gpu}")
-        torch.distributed.barrier()
+            print(f"|-Barrier for process {args.rank} on GPU {args.gpu}")
+        
+        # Add these two lines before the barrier for debugging
+        dist.all_reduce(torch.ones(1).to(args.gpu))
+        print(f"| Process {args.rank} passed all_reduce test", flush=True)
+        
+        # Replace standard barrier with timeout version
+        torch.distributed.barrier(timeout=datetime.timedelta(seconds=60))
         print(f'| Process {args.rank} passed barrier on GPU {args.gpu}', flush=True)
     except Exception as e:
         print(f"Error during barrier: {e}")
-
+        # Continue execution even if barrier fails
+        pass
     # Uncomment if needed - disable printing for non-master processes
     setup_for_distributed(args.rank == 0) 
 
