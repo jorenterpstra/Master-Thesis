@@ -29,13 +29,12 @@ export MKL_NUM_THREADS=2
 
 # Select the GPUs with the least memory usage
 
-srun --ntasks=2 --ntasks-per-node=2 \
-    python -m torch.distributed.launch \
+torchrun --ntasks=2 \
+    --ntasks-per-node=2 \
     --nproc_per_node=1 \
     --nnodes=1 \
-    --node_rank=0 \
-    --master_addr="$(hostname)" \
-    --master_port=$(shuf -i 10000-65500 -n 1) \
+    --master_addr=$MASTER_ADDR \
+    --master_port=$MASTER_PORT \
     main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
