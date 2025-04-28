@@ -203,9 +203,14 @@ def get_rank():
         return 0
     return dist.get_rank()
 
+def get_gpu():
+    if not is_dist_avail_and_initialized():
+        return 0
+    return int(os.environ['LOCAL_RANK']) if 'LOCAL_RANK' in os.environ else get_rank() % torch.cuda.device_count()
+
 
 def is_main_process():
-    return get_rank() == 0
+    return get_gpu() == 0
 
 
 def save_on_master(*args, **kwargs):

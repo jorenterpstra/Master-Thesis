@@ -4,6 +4,7 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-node=4
 #SBATCH --cpus-per-task=4
+#SBATCH --gpu-freq=medium # Request medium priority GPU access
 
 # Setting up environment variables for distributed training
 # Print environment for debugging

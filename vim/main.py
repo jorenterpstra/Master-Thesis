@@ -580,25 +580,25 @@ def main(args):
 
         print(f'Max accuracy: {max_accuracy:.2f}%')
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                     **{f'test_{k}': v for k, v in test_stats.items()},
+        # Create log_stats dictionary without large data structures
+        log_stats = {**{f'train_{k}': v for k, v in train_stats.items() if k not in ['predictions', 'targets']},
+                     **{f'test_{k}': v for k, v in test_stats.items() if k not in ['predictions', 'targets']},
                      'epoch': epoch,
                      'n_parameters': n_parameters}
-        
-        # log about
+
+        # Log to MLflow if on main process
         if args.local_rank == 0 and args.gpu == 0:
             for key, value in log_stats.items():
-                # Skip tensors and only log scalar values
-                if key not in ['test_predictions', 'test_targets'] and not isinstance(value, torch.Tensor):
+                if not isinstance(value, torch.Tensor):
                     try:
-                        # Try to convert to scalar if needed
+                        # Convert to scalar if needed
                         if hasattr(value, 'item'):
                             value = value.item()
-                        mlflow.log_metric(key, value, log_stats['epoch'])
+                        mlflow.log_metric(key, value, epoch)
                     except Exception as e:
-                        print(f"Warning: Could not log {key} to MLflow: {e}")
-        
-        
+                        print(f"MLflow logging error ({key}): {e}")
+
+        # Write to log file if on main process
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
