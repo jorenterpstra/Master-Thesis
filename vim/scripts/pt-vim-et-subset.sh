@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=vim-extra-tiny
 #SBATCH --time=10-00:00:00
-#SBATCH --ntasks-per-node=2
-#SBATCH --gpus-per-node=2
+#SBATCH --ntasks-per-node=4
+#SBATCH --gpus-per-node=4
 #SBATCH --cpus-per-task=4
 
 # Setting up environment variables for distributed training
@@ -41,7 +41,6 @@ torchrun \
     --pin-mem \
     --mixup 0.0 \
     --cutmix 0.0 \
-    --debug
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
 #     --batch-size 64 \
