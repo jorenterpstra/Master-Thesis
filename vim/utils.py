@@ -295,6 +295,10 @@ def init_distributed_mode(args):
         args.rank, args.dist_url, args.gpu), flush=True)
 
     try:
+        if args.debug:
+            print(f"Initializing process group with backend {args.dist_backend}")
+            print(f"Using init method: {args.dist_url}")
+            print(f"World size: {args.world_size}, rank: {args.rank}")
         torch.distributed.init_process_group(backend=args.dist_backend, 
                                           init_method=args.dist_url,
                                           world_size=args.world_size, 
