@@ -242,6 +242,8 @@ def init_distributed_mode(args):
             if args.debug:
                 print('Using SLURM_PROCID for GPU assignment')
             args.gpu = args.rank % torch.cuda.device_count()
+
+        args.world_size = int(os.environ['SLURM_NTASKS'])
         
         if args.debug:
             print(f"Process rank: {args.rank}, assigned to GPU: {args.gpu}")
