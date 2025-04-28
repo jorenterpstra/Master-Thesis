@@ -162,7 +162,7 @@ def resize_image(img_path, target_size=(224, 224)):
         print(f"Error resizing image {img_path}: {e}")
         return None
 
-def process_class_folder(class_folder, output_dir, patch_size, stride, training_path, num_bboxes, exts=('jpg','jpeg','png')):
+def process_class_folder(class_folder, output_dir, patch_size, stride, training_path, num_bboxes, exts=('jpg','jpeg','png', 'JPEG','PNG')):
     """
     Process all images in a single class folder: generate patch rankings using BING saliency,
     then write the rankings into a class-specific CSV file.
