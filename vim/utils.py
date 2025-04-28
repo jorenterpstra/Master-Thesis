@@ -289,7 +289,7 @@ def init_distributed_mode(args):
         print(f"Error during barrier: {e}")
 
     # Uncomment if needed - disable printing for non-master processes
-    #setup_for_distributed(args.rank == 0) 
+    setup_for_distributed(args.rank == 0) 
     
     if args.debug:
         print('| done with init process group', flush=True)
