@@ -36,7 +36,7 @@ torchrun \
     --batch-size 128 \
     --drop-path 0.0 \
     --weight-decay 0.1 \
-    --num_workers 8 \
+    --num_workers 16 \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
     --output_dir ./output/vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2_no_spatial_transforms \
     --no_amp \
