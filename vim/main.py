@@ -29,6 +29,7 @@ from tqdm.auto import tqdm
 import models_mamba
 
 import utils
+from utils import timer  # Import timer from utils now
 
 # log about
 import mlflow
@@ -280,7 +281,8 @@ def main(args):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=args.pin_mem,
-        prefetch_factor=2,
+        prefetch_factor=4,
+        persistent_workers=True,
         drop_last=True,
         timeout=200
     )
@@ -292,7 +294,8 @@ def main(args):
         batch_size=int(1.5 * args.batch_size * 20),
         num_workers=args.num_workers,
         pin_memory=args.pin_mem,
-        prefetch_factor=2,
+        prefetch_factor=4,
+        persistent_workers=True,
         drop_last=False
     )
     print(f"Train dataset has {len(dataset_train)} images, val has {len(dataset_val)} images")
@@ -395,10 +398,8 @@ def main(args):
             resume='')
 
     model_without_ddp = model
-    print(f"Sending model to device {device} before DDP")
     if args.distributed:
-        if args.debug:
-            print('Using DistributedDataParallel')
+        print('Using DistributedDataParallel')
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -498,15 +499,17 @@ def main(args):
     start_time = time.time()
     max_accuracy = 0.0
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
-            data_loader_train.sampler.set_epoch(epoch)
-        train_stats = train_one_epoch(
-            model, criterion, data_loader_train,
-            optimizer, device, epoch, loss_scaler, amp_autocast,
-            args.clip_grad, model_ema, mixup_fn,
-            set_training_mode=args.train_mode,  # keep in eval mode for deit finetuning / train mode for training and deit III finetuning
-            args=args,
-        )
+        with timer("Data loader setup"):
+            if args.distributed:
+                data_loader_train.sampler.set_epoch(epoch)
+        with timer("Training epoch"):
+            train_stats = train_one_epoch(
+                model, criterion, data_loader_train,
+                optimizer, device, epoch, loss_scaler, amp_autocast,
+                args.clip_grad, model_ema, mixup_fn,
+                set_training_mode=args.train_mode,  # keep in eval mode for deit finetuning / train mode for training and deit III finetuning
+                args=args,
+            )
 
         lr_scheduler.step(epoch)
         if args.output_dir:
@@ -523,8 +526,9 @@ def main(args):
                 }, checkpoint_path)
              
 
-        test_stats = evaluate(data_loader_val, model, device, amp_autocast)
-        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+        with timer("Validation"):
+            test_stats = evaluate(data_loader_val, model, device, amp_autocast)
+            print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         
         # Print comparison of training and validation metrics to monitor overfitting
         train_acc1 = train_stats.get('train_acc1', 0)  # Default to 0 if not available (e.g. with mixup)

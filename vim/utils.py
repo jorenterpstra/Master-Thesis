@@ -10,9 +10,19 @@ import os
 import time
 from collections import defaultdict, deque
 import datetime
+from contextlib import contextmanager
 
 import torch
 import torch.distributed as dist
+
+
+@contextmanager
+def timer(name):
+    """Context manager for timing code execution."""
+    start = time.time()
+    yield
+    end = time.time()
+    print(f"[{torch.distributed.get_rank()}] {name}: {end-start:.3f}s")
 
 
 class SmoothedValue(object):

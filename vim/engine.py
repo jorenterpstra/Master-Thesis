@@ -18,6 +18,8 @@ import utils
 import os
 import numpy as np
 
+from utils import timer
+
 
 def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -50,8 +52,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         if args.debug:
             print("------------- Samples are being loaded to device ", device)
             
-        samples = samples.to(device, non_blocking=True)
-        targets = targets.to(device, non_blocking=True)
+        with timer("Loading samples to device"):
+            samples = samples.to(device, non_blocking=True)
+            targets = targets.to(device, non_blocking=True)
+            
         if rankings is not None:
             rankings = rankings.to(device, non_blocking=True)
             # Handle global ordering case
@@ -85,12 +89,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         # print('BCE loss applied')
 
         with amp_autocast():
-            outputs = model(
-                samples, 
-                if_random_cls_token_position=args.if_random_cls_token_position, 
-                if_random_token_rank=args.if_random_token_rank,
-                custom_rank=rankings
-            )
+            with timer("Forward pass"):
+                outputs = model(
+                    samples, 
+                    if_random_cls_token_position=args.if_random_cls_token_position, 
+                    if_random_token_rank=args.if_random_token_rank,
+                    custom_rank=rankings
+                )
             
             if not args.cosub:
                 loss = criterion(samples, outputs, targets)
@@ -103,7 +108,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
         if args.if_nan2num:
             with amp_autocast():
-                loss = torch.nan_to_num(loss)
+                with timer("Loss scaling"):
+                    loss = torch.nan_to_num(loss)
         loss_value = loss.item()
         if args.debug:
             print('Loss value calculated = ', loss_value)
