@@ -218,81 +218,85 @@ def init_distributed_mode(args):
         if args.debug:
             print('Using SLURM')
         args.rank = int(os.environ['SLURM_PROCID'])
-        args.gpu = args.rank % torch.cuda.device_count()
+        # IMPORTANT: Always set GPU index based on LOCAL_RANK for proper distribution
+        if 'LOCAL_RANK' in os.environ:
+            args.gpu = int(os.environ['LOCAL_RANK'])
+        else:
+            args.gpu = args.rank % torch.cuda.device_count()
+        
+        if args.debug:
+            print(f"Process rank: {args.rank}, assigned to GPU: {args.gpu}")
     elif 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
         if args.debug:
             print('Using environment variables for distributed configuration')
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
-        args.gpu = int(os.environ['LOCAL_RANK'])
+        
+        # IMPORTANT: Always set GPU index based on LOCAL_RANK for proper distribution
+        args.gpu = int(os.environ['LOCAL_RANK']) if 'LOCAL_RANK' in os.environ else args.rank % torch.cuda.device_count()
+        
         if args.debug:
-            print(f"Rank: {args.rank}, World size: {args.world_size}, GPU: {args.gpu}")
+            print(f"Process rank: {args.rank}, world size: {args.world_size}, using GPU: {args.gpu}")
     else:
         if args.debug:
             print('Not using distributed mode')
         args.distributed = False
         return
-    
+
     args.distributed = True
+    
+    # Print available GPUs to help diagnose issues
+    if args.debug:
+        print(f"Number of GPUs available: {torch.cuda.device_count()}")
+        for i in range(torch.cuda.device_count()):
+            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
     
     # Ensure CUDA is available
     if not torch.cuda.is_available():
         print("Warning: CUDA not available but trying to use distributed mode")
-    
-    # Check that the requested GPU is valid
-    gpu_count = torch.cuda.device_count()
-    if args.gpu >= gpu_count:
-        print(f"Warning: Specified GPU index {args.gpu} exceeds available GPUs ({gpu_count})")
-        args.gpu = args.gpu % max(1, gpu_count)
-        print(f"Using GPU {args.gpu} instead")
+        return
     
     # Set the CUDA device
     try:
         torch.cuda.set_device(args.gpu)
         if args.debug:
-            print(f"Set CUDA device to {args.gpu}")
+            print(f"Process {args.rank}: Set CUDA device to GPU {args.gpu}")
+            # Verify we're on the right device
+            current_device = torch.cuda.current_device()
+            if current_device != args.gpu:
+                print(f"Warning: Expected device {args.gpu}, got {current_device}")
+            
+            # Print memory info for this GPU
+            print(f"GPU {args.gpu} memory allocated: {torch.cuda.memory_allocated(args.gpu) / 1e9:.3f} GB")
     except Exception as e:
         print(f"Error setting CUDA device: {e}")
 
     args.dist_backend = 'nccl'
-    print('| distributed init (rank {}): {}'.format(
-        args.rank, args.dist_url), flush=True)
-    
-    # Initialize process group with timeout and retry logic
-    max_retries = 3
-    retry_count = 0
-    init_success = False
-    
-    while retry_count < max_retries and not init_success:
-        try:
-            torch.distributed.init_process_group(backend=args.dist_backend, 
-                                              init_method=args.dist_url,
-                                              world_size=args.world_size, 
-                                              rank=args.rank,
-                                              timeout=datetime.timedelta(minutes=10))
-            init_success = True
-        except Exception as e:
-            retry_count += 1
-            print(f"Process group initialization failed (attempt {retry_count}/{max_retries}): {e}")
-            time.sleep(10)  # Wait before retrying
-    
-    if not init_success:
-        print("Failed to initialize distributed process group after multiple attempts")
+    print('| distributed init (rank {}): {}, gpu {}'.format(
+        args.rank, args.dist_url, args.gpu), flush=True)
+
+    try:
+        torch.distributed.init_process_group(backend=args.dist_backend, 
+                                          init_method=args.dist_url,
+                                          world_size=args.world_size, 
+                                          rank=args.rank)
+    except Exception as e:
+        print(f"Failed to initialize distributed process group: {e}")
         args.distributed = False
         return
 
     try:
         torch.distributed.barrier()
         if args.debug:
-            print('| barrier ', flush=True)
+            print(f'| Process {args.rank} passed barrier on GPU {args.gpu}', flush=True)
     except Exception as e:
         print(f"Error during barrier: {e}")
 
     # Uncomment if needed - disable printing for non-master processes
     setup_for_distributed(args.rank == 0) 
-    
+
     if args.debug:
-        print('| done with init process group', flush=True)
+        print(f'| Process {args.rank} done with init process group on GPU {args.gpu}', flush=True)
 
 
 # if 'pos_embed' in state_dict:
