@@ -22,9 +22,9 @@ conda activate mamba
 
 export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
-# export NCCL_DEBUG=INFO
-# export NCCL_ASYNC_ERROR_HANDLING=1
-# export PYTHONUNBUFFERED=1
+export NCCL_DEBUG=INFO
+export NCCL_ASYNC_ERROR_HANDLING=1
+export PYTHONUNBUFFERED=1
 
 # Select the GPUs with the least memory usage
 
