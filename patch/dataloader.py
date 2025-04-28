@@ -301,6 +301,7 @@ class ImageNetPatchRankLoader(torch.utils.data.Dataset):
         
         bboxes = self.parse_bbox(bbox_path, orig_size)
         if bboxes is None:
+            print(f"Warning: No valid bounding boxes found for {img_path}. Using default bbox.")
             bboxes = [[0, 0, orig_size[0], orig_size[1]]]
         
         # Transform image and bboxes for model input
