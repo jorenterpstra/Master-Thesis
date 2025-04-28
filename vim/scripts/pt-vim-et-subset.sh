@@ -32,7 +32,6 @@ torchrun \
     --nnodes=1 \
     --nproc-per-node=2 \
     --rdzv_id=${SLURM_JOB_ID} \
-    --rdzv_backend=c10d \
     main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
