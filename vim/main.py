@@ -228,7 +228,6 @@ def main(args):
     utils.init_distributed_mode(args)
 
     print(args)
-    args.gpu = 0 # TODO this needs to be fixed for multi-gpu
     if args.distillation_type != 'none' and args.finetune and not args.eval:
         raise NotImplementedError("Finetuning with distillation not yet supported")
 

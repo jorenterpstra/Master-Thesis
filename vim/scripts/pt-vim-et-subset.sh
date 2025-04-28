@@ -1,39 +1,47 @@
 #!/bin/bash
 #SBATCH --job-name=vim-extra-tiny
 #SBATCH --time=10-00:00:00
+#SBATCH --ntasks-per-node=2
+#SBATCH --gpus-per-node=2
+#SBATCH --cpus-per-task=4
 
-# Get least used GPU before loading any CUDA modules but print how much memory is used for all GPUs
-GPU_ID=$(nvidia-smi --query-gpu=memory.used,index --format=csv,noheader,nounits | \
-         sort -n | \
-         head -n1 | \
-         cut -d, -f2)
+# Setting up environment variables for distributed training
+# Only set master address and port, let torchrun handle the rest
+export MASTER_ADDR=$(hostname)
+export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
 
-# Export GPU selection BEFORE loading modules
-export CUDA_VISIBLE_DEVICES=$GPU_ID
-echo "Setting CUDA_VISIBLE_DEVICES=$GPU_ID"
-export MASTER_ADDR=$(scontrol show hostname ${SLURM_NODELIST} | head -n 1)
-echo "Setting MASTER_ADDR=$MASTER_ADDR"
+echo "Setting up distributed environment:"
+echo "- MASTER_ADDR=$MASTER_ADDR"
+echo "- MASTER_PORT=$MASTER_PORT"
+echo "- SLURM environment: SLURM_PROCID=$SLURM_PROCID, SLURM_LOCALID=$SLURM_LOCALID"
 
 # Load modules
 module load cuda/11.8
 source ~/.bashrc
 conda activate mamba
 
+# Print GPU information
+nvidia-smi
+
 torchrun \
     --nnodes=1 \
+    --nproc-per-node=2 \
+    --master_addr=$MASTER_ADDR \
+    --master_port=$MASTER_PORT \
     main.py \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
-    --batch-size 128 \
+    --batch-size 64 \
     --drop-path 0.0 \
     --weight-decay 0.1 \
-    --num_workers 16 \
+    --num_workers 8 \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
-    --output_dir ./output/vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
+    --output_dir ./output/vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2_no_spatial_transforms \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
     --cutmix 0.0 \
-    # --debug 
+    --dist-url env:// \
+    --debug
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
 #     --batch-size 64 \

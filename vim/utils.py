@@ -214,7 +214,12 @@ def save_on_master(*args, **kwargs):
 
 
 def init_distributed_mode(args):
-    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+    if 'SLURM_PROCID' in os.environ:
+        if args.debug:
+            print('Using SLURM')
+        args.rank = int(os.environ['SLURM_PROCID'])
+        args.gpu = args.rank % torch.cuda.device_count()
+    elif 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
         if args.debug:
             print('Using environment variables for distributed configuration')
         args.rank = int(os.environ["RANK"])
@@ -222,13 +227,6 @@ def init_distributed_mode(args):
         args.gpu = int(os.environ['LOCAL_RANK'])
         if args.debug:
             print(f"Rank: {args.rank}, World size: {args.world_size}, GPU: {args.gpu}")
-    # TODO this is not working, SLURM is not setting the environment variables properly
-    # but does work when I only use one GPU
-    elif 'SLURM_PROCID' in os.environ:
-        if args.debug:
-            print('Using SLURM')
-        args.rank = int(os.environ['SLURM_PROCID'])
-        args.gpu = args.rank % torch.cuda.device_count()
     else:
         if args.debug:
             print('Not using distributed mode')
@@ -236,18 +234,63 @@ def init_distributed_mode(args):
         return
     
     args.distributed = True
-    torch.cuda.set_device(args.gpu)
+    
+    # Ensure CUDA is available
+    if not torch.cuda.is_available():
+        print("Warning: CUDA not available but trying to use distributed mode")
+    
+    # Check that the requested GPU is valid
+    gpu_count = torch.cuda.device_count()
+    if args.gpu >= gpu_count:
+        print(f"Warning: Specified GPU index {args.gpu} exceeds available GPUs ({gpu_count})")
+        args.gpu = args.gpu % max(1, gpu_count)
+        print(f"Using GPU {args.gpu} instead")
+    
+    # Set the CUDA device
+    try:
+        torch.cuda.set_device(args.gpu)
+        if args.debug:
+            print(f"Set CUDA device to {args.gpu}")
+    except Exception as e:
+        print(f"Error setting CUDA device: {e}")
+
     args.dist_backend = 'nccl'
     print('| distributed init (rank {}): {}'.format(
         args.rank, args.dist_url), flush=True)
-    torch.distributed.init_process_group(backend=args.dist_backend, 
-                                         init_method=args.dist_url,
-                                         world_size=args.world_size, 
-                                         rank=args.rank)
-    torch.distributed.barrier()
-    if args.debug:
-        print('| barrier ', flush=True)
+    
+    # Initialize process group with timeout and retry logic
+    max_retries = 3
+    retry_count = 0
+    init_success = False
+    
+    while retry_count < max_retries and not init_success:
+        try:
+            torch.distributed.init_process_group(backend=args.dist_backend, 
+                                              init_method=args.dist_url,
+                                              world_size=args.world_size, 
+                                              rank=args.rank,
+                                              timeout=datetime.timedelta(minutes=10))
+            init_success = True
+        except Exception as e:
+            retry_count += 1
+            print(f"Process group initialization failed (attempt {retry_count}/{max_retries}): {e}")
+            time.sleep(10)  # Wait before retrying
+    
+    if not init_success:
+        print("Failed to initialize distributed process group after multiple attempts")
+        args.distributed = False
+        return
+
+    try:
+        torch.distributed.barrier()
+        if args.debug:
+            print('| barrier ', flush=True)
+    except Exception as e:
+        print(f"Error during barrier: {e}")
+
+    # Uncomment if needed - disable printing for non-master processes
     #setup_for_distributed(args.rank == 0) 
+    
     if args.debug:
         print('| done with init process group', flush=True)
 

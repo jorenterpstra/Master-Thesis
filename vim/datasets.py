@@ -66,6 +66,7 @@ class RankedImageFolder(ImageFolder):
     def __init__(self, root, rankings_dir, transform=None, target_transform=None,
                  loader=default_loader, is_valid_file=None, random_rankings=False,
                  cache_rankings=True, log_level="INFO", return_path=False):
+        # No transform tracking needed since we removed spatial transforms
         super(RankedImageFolder, self).__init__(root, transform=transform,
                                               target_transform=target_transform,
                                               loader=loader, is_valid_file=is_valid_file)
@@ -262,34 +263,23 @@ def build_dataset(is_train, args):
 
 
 def build_transform(is_train, args):
-    resize_im = args.input_size > 32
-    if is_train:
-        # this should always dispatch to transforms_imagenet_train
-        transform = create_transform(
-            input_size=args.input_size,
-            is_training=True,
-            color_jitter=args.color_jitter,
-            auto_augment=args.aa,
-            interpolation=args.train_interpolation,
-            re_prob=args.reprob,
-            re_mode=args.remode,
-            re_count=args.recount,
-        )
-        if not resize_im:
-            # replace RandomResizedCropAndInterpolation with
-            # RandomCrop
-            transform.transforms[0] = transforms.RandomCrop(
-                args.input_size, padding=4)
-        return transform
-
+    """Build transforms with resize but no other spatial transformations."""
     t = []
-    if resize_im:
-        size = int(args.input_size / args.eval_crop_ratio)
-        t.append(
-            transforms.Resize(size, interpolation=3),  # to maintain same ratio w.r.t. 224 images
-        )
-        t.append(transforms.CenterCrop(args.input_size))
-
+    
+    # Include resize to ensure proper input dimensions
+    if args.input_size > 32:  # Skip resize for small images like CIFAR
+        t.append(transforms.Resize((args.input_size, args.input_size), interpolation=3))
+    
+    # Non-spatial transformations
+    if is_train and args.color_jitter > 0:
+        t.append(transforms.ColorJitter(
+            brightness=args.color_jitter,
+            contrast=args.color_jitter,
+            saturation=args.color_jitter))
+        t.append(transforms.RandomGrayscale())
+    
+    # Essential transformations
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
+    
     return transforms.Compose(t)
