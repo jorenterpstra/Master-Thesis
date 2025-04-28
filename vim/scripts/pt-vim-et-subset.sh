@@ -29,10 +29,13 @@ export MKL_NUM_THREADS=2
 
 # Select the GPUs with the least memory usage
 
-torchrun \
+srun --ntasks=2 --ntasks-per-node=2 \
+    python -m torch.distributed.launch \
+    --nproc_per_node=1 \
     --nnodes=1 \
-    --nproc-per-node=2 \
-    --rdzv_id=${SLURM_JOB_ID} \
+    --node_rank=0 \
+    --master_addr="$(hostname)" \
+    --master_port=$(shuf -i 10000-65500 -n 1) \
     main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
@@ -46,6 +49,7 @@ torchrun \
     --pin-mem \
     --mixup 0.0 \
     --cutmix 0.0
+
 # CUDA_VISIBLE_DEVICES=0 python main.py \
 #     --model vim_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
 #     --batch-size 64 \
