@@ -24,7 +24,7 @@ export MKL_NUM_THREADS=2
 
 # Select the GPUs with the least memory usage
 
-torchrun --nproc_per_node=2 \
+python -m torch.distributed.launch --nproc_per_node=2 \
     --nnodes=1 \
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
