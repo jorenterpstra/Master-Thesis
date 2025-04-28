@@ -235,8 +235,12 @@ def init_distributed_mode(args):
         args.rank = int(os.environ['SLURM_PROCID'])
         # IMPORTANT: Always set GPU index based on LOCAL_RANK for proper distribution
         if 'LOCAL_RANK' in os.environ:
+            if args.debug:
+                print(f'Using LOCAL_RANK {os.environ["LOCAL_RANK"]}')
             args.gpu = int(os.environ['LOCAL_RANK'])
         else:
+            if args.debug:
+                print('Using SLURM_PROCID for GPU assignment')
             args.gpu = args.rank % torch.cuda.device_count()
         
         if args.debug:
