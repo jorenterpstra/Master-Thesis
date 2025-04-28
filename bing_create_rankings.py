@@ -316,7 +316,7 @@ def process_imagenet_subset(data_dir, output_dir, patch_size, stride, training_p
             class_name = os.path.basename(class_folder)
             # Count images in this class
             image_count = 0
-            for ext in ('jpg', 'jpeg', 'png'):
+            for ext in ('jpg', 'jpeg', 'png', 'JPEG', 'PNG'):
                 image_count += len(glob(os.path.join(class_folder, f'*.{ext}')))
                 
             meta_writer.writerow([
