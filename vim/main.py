@@ -588,7 +588,15 @@ def main(args):
         # log about
         if args.local_rank == 0 and args.gpu == 0:
             for key, value in log_stats.items():
-                mlflow.log_metric(key, value, log_stats['epoch'])
+                # Skip tensors and only log scalar values
+                if key not in ['test_predictions', 'test_targets'] and not isinstance(value, torch.Tensor):
+                    try:
+                        # Try to convert to scalar if needed
+                        if hasattr(value, 'item'):
+                            value = value.item()
+                        mlflow.log_metric(key, value, log_stats['epoch'])
+                    except Exception as e:
+                        print(f"Warning: Could not log {key} to MLflow: {e}")
         
         
         if args.output_dir and utils.is_main_process():

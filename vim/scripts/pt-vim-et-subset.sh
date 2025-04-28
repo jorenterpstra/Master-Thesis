@@ -1,14 +1,14 @@
 #!/bin/bash
 #SBATCH --job-name=vim-extra-tiny
 #SBATCH --time=10-00:00:00
-#SBATCH --ntasks-per-node=3
-#SBATCH --gpus-per-node=3
+#SBATCH --ntasks-per-node=2
+#SBATCH --gpus-per-node=2
 #SBATCH --cpus-per-task=4
 
 # Setting up environment variables for distributed training
 # Print environment for debugging
-echo "==== SLURM Environment Variables ===="
-env | grep SLURM
+# echo "==== SLURM Environment Variables ===="
+# env | grep SLURM
 
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
@@ -30,7 +30,7 @@ nvidia-smi
 
 torchrun \
     --nnodes=1 \
-    --nproc-per-node=3 \
+    --nproc-per-node=2 \
     --rdzv_id=${SLURM_JOB_ID} \
     main.py \
     --data-set IMNET \
