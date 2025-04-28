@@ -26,6 +26,9 @@ conda activate mamba
 # Print GPU information
 nvidia-smi
 
+export OMP_NUM_THREADS=4
+export MKL_NUM_THREADS=4
+
 # Select the GPUs with the least memory usage
 
 torchrun \
