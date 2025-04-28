@@ -305,6 +305,8 @@ def init_distributed_mode(args):
                                           init_method=args.dist_url,
                                           world_size=args.world_size, 
                                           rank=args.rank)
+        if args.debug:
+            print(f"Process group initialized successfully")
     except Exception as e:
         print(f"Failed to initialize distributed process group: {e}")
         args.distributed = False
