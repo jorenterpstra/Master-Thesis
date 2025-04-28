@@ -6,7 +6,10 @@
 #SBATCH --cpus-per-task=4
 
 # Setting up environment variables for distributed training
-# Only set master address and port, let torchrun handle the rest
+# Print environment for debugging
+echo "==== SLURM Environment Variables ===="
+env | grep SLURM
+
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
 
@@ -28,10 +31,8 @@ nvidia-smi
 torchrun \
     --nnodes=1 \
     --nproc-per-node=2 \
-    --master_addr=$MASTER_ADDR \
-    --master_port=$MASTER_PORT \
+    --rdzv_id=${SLURM_JOB_ID} \
     --rdzv_backend=c10d \
-    --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
     main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \

@@ -287,8 +287,7 @@ def init_distributed_mode(args):
 
     try:
         torch.distributed.barrier()
-        if args.debug:
-            print(f'| Process {args.rank} passed barrier on GPU {args.gpu}', flush=True)
+        print(f'| Process {args.rank} passed barrier on GPU {args.gpu}', flush=True)
     except Exception as e:
         print(f"Error during barrier: {e}")
 
