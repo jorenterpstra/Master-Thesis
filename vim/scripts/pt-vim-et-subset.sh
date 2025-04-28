@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=vim-extra-tiny
 #SBATCH --time=10-00:00:00
-#SBATCH --ntasks-per-node=2
-#SBATCH --gpus-per-node=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --gpu-freq=medium # Request medium priority GPU access
 
@@ -24,17 +24,14 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate mamba
 
-# Add to your script to profile GPU utilization
-nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv -l 5
-
-export OMP_NUM_THREADS=2
-export MKL_NUM_THREADS=2
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
 
 # Select the GPUs with the least memory usage
 
 torchrun \
     --nnodes=1 \
-    --nproc-per-node=2 \
+    --nproc-per-node=1 \
     --rdzv_id=${SLURM_JOB_ID} \
     main.py \
     --data-set IMNET \
