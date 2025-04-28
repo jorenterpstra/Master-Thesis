@@ -8,6 +8,7 @@
 
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
+export WORLD_SIZE=2
 
 echo "Setting up distributed environment:"
 echo "- MASTER_ADDR=$MASTER_ADDR"
@@ -21,13 +22,13 @@ conda activate mamba
 
 export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
-export NCCL_DEBUG=WARN
+export NCCL_DEBUG=INFO
 export NCCL_ASYNC_ERROR_HANDLING=1
 export PYTHONUNBUFFERED=1
 
 # Select the GPUs with the least memory usage
 
-srun --ntasks=2 --nodes=1 --gpus-per-task=1 \
+srun --ntasks=2 --nodes=1 --gpus-per-task=1 --export=ALL\
     python main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
