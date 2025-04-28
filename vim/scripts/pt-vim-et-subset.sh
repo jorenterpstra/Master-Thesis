@@ -6,11 +6,6 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gpu-freq=medium # Request medium priority GPU access
 
-# Setting up environment variables for distributed training
-# Print environment for debugging
-# echo "==== SLURM Environment Variables ===="
-# env | grep SLURM
-
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
 
@@ -29,7 +24,7 @@ export MKL_NUM_THREADS=2
 
 # Select the GPUs with the least memory usage
 
-torchrun --nproc_per_node=1 \
+torchrun --nproc_per_node=2 \
     --nnodes=1 \
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
