@@ -220,7 +220,7 @@ def get_gpu():
 
 
 def is_main_process():
-    return get_gpu() == 0
+    return get_rank() == 0
 
 
 def save_on_master(*args, **kwargs):
@@ -307,7 +307,7 @@ def init_distributed_mode(args):
         print(f"Error during barrier: {e}")
 
     # Uncomment if needed - disable printing for non-master processes
-    setup_for_distributed(args.gpu == 0) 
+    setup_for_distributed(args.rank == 0) 
 
     if args.debug:
         print(f'| Process {args.rank} done with init process group on GPU {args.gpu}', flush=True)
