@@ -22,7 +22,7 @@ def timer(name):
     start = time.time()
     yield
     end = time.time()
-    print(f"[GPU {get_gpu()}] {name}: {end-start:.3f}s")
+    #print(f"[GPU {get_gpu()}] {name}: {end-start:.3f}s")
 
 
 class SmoothedValue(object):
