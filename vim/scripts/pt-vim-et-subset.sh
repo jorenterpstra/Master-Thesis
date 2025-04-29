@@ -8,7 +8,6 @@
 
 export MASTER_ADDR=$(scontrol show hostname ${SLURM_NODELIST} | head -n 1)
 export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
-export WORLD_SIZE=2
 
 echo "Setting up distributed environment:"
 echo "- MASTER_ADDR=$MASTER_ADDR"
@@ -23,14 +22,14 @@ conda activate mamba
 export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
 
-export NCCL_DEBUG=INFO
-export NCCL_SOCKET_IFNAME=eno8303  # Use the network interface shown in previous logs
-export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
-export NCCL_P2P_DISABLE=0         # Enable P2P if available
-export NCCL_SHM_DISABLE=0         # Enable shared memory
-export NCCL_BLOCKING_WAIT=1       # Use blocking synchronization
-export NCCL_ASYNC_ERROR_HANDLING=1
-export PYTHONUNBUFFERED=1
+# export NCCL_DEBUG=INFO
+# export NCCL_SOCKET_IFNAME=eno8303  # Use the network interface shown in previous logs
+# export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
+# export NCCL_P2P_DISABLE=0         # Enable P2P if available
+# export NCCL_SHM_DISABLE=0         # Enable shared memory
+# export NCCL_BLOCKING_WAIT=1       # Use blocking synchronization
+# export NCCL_ASYNC_ERROR_HANDLING=1
+# export PYTHONUNBUFFERED=1
 
 # Select the GPUs with the least memory usage
 
