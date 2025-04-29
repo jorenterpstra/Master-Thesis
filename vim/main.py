@@ -166,6 +166,8 @@ def get_args_parser():
                         type=str, help='Image Net dataset path')
     parser.add_argument('--rankings-path', default='', type=str,
                         help='ranking path')
+    parser.add_argument('--global-ranking-path', default='', type=str,
+                        help='Path to global ranking tensor file that will be used for all images')
     parser.add_argument('--inat-category', default='name',
                         choices=['kingdom', 'phylum', 'class', 'order', 'supercategory', 'family', 'genus', 'name'],
                         type=str, help='semantic granularity')

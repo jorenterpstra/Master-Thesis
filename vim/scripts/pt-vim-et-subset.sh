@@ -21,7 +21,7 @@ export MKL_NUM_THREADS=2
 
 # export NCCL_DEBUG=INFO
 # export NCCL_SOCKET_IFNAME=eno8303  # Use the network interface shown in previous logs
-export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
+# export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
 export NCCL_P2P_DISABLE=1
 # export NCCL_SHM_DISABLE=0
 # export NCCL_BLOCKING_WAIT=1       # Use blocking synchronization

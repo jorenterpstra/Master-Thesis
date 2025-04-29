@@ -65,7 +65,7 @@ class RankedImageFolder(ImageFolder):
     """
     def __init__(self, root, rankings_dir, transform=None, target_transform=None,
                  loader=default_loader, is_valid_file=None, random_rankings=False,
-                 cache_rankings=True, log_level="INFO", return_path=False):
+                 cache_rankings=True, log_level="INFO", return_path=False, global_ranking=None):
         # No transform tracking needed since we removed spatial transforms
         super(RankedImageFolder, self).__init__(root, transform=transform,
                                               target_transform=target_transform,
@@ -74,6 +74,7 @@ class RankedImageFolder(ImageFolder):
         self.rankings_dir = rankings_dir
         self.random_rankings = random_rankings
         self.cache_rankings = cache_rankings
+        self.global_ranking = global_ranking  # Global ranking parameter
 
         # Setup logger
         self.logger = logging.getLogger("RankedImageFolder")
@@ -93,7 +94,12 @@ class RankedImageFolder(ImageFolder):
 
         # Rankings dict: {image_path: tensor}
         self.rankings = {}
-
+        
+        # Skip loading individual rankings if global ranking is provided
+        if self.global_ranking is not None:
+            self._log(f"Using global ranking for all images. Skipping individual rankings loading.", "info")
+            return
+            
         # Rankings cache file
         self.rankings_cache_file = os.path.join(self.rankings_dir, "rankings_cache.pkl")
 
@@ -205,23 +211,31 @@ class RankedImageFolder(ImageFolder):
         Returns (image, target, ranking, path)
         """
         path, target = self.samples[index]
-        filename = os.path.basename(path)
-        class_name = os.path.basename(os.path.dirname(path))
         image = self.loader(path)
         if self.transform is not None:
             image = self.transform(image)
         if self.target_transform is not None:
             target = self.target_transform(target)
-        if path in self.rankings:
+            
+        # Use global ranking if provided (this will be the fastest path)
+        if self.global_ranking is not None:
+            ranking = self.global_ranking
+        # Otherwise, use image-specific ranking
+        elif path in self.rankings:
             ranking = self.rankings[path]
         else:
             ranking = torch.arange(self.total_patches, dtype=torch.long)
-            if hasattr(self, '_warning_count') and self._warning_count < 10:
-                self._log(f"No ranking found for {filename} in class {class_name} (path: {path})", "warning")
-                self._warning_count += 1
-            elif not hasattr(self, '_warning_count'):
-                self._warning_count = 1
-                self._log(f"No ranking found for {filename} in class {class_name} (path: {path})", "warning")
+            # Only log warnings if we're not deliberately using random or global rankings
+            if not self.random_rankings:
+                filename = os.path.basename(path)
+                class_name = os.path.basename(os.path.dirname(path))
+                if hasattr(self, '_warning_count') and self._warning_count < 10:
+                    self._log(f"No ranking found for {filename} in class {class_name}", "warning")
+                    self._warning_count += 1
+                elif not hasattr(self, '_warning_count'):
+                    self._warning_count = 1
+                    self._log(f"No ranking found for {filename} in class {class_name}", "warning")
+                
         if self.return_path:
             return image, target, ranking, path
         else:
@@ -250,7 +264,22 @@ def build_dataset(is_train, args):
     elif args.data_set == 'IMNET_RANK':
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         rankings_dir = os.path.join(args.rankings_path, 'train' if is_train else 'val')
-        dataset = RankedImageFolder(root, rankings_dir, transform=transform)
+        global_ranking = None
+        
+        # Load global ranking if specified
+        if hasattr(args, 'global_ranking_path') and args.global_ranking_path:
+            try:
+                global_ranking = torch.load(args.global_ranking_path)
+                print(f"Using global ranking from {args.global_ranking_path}")
+            except Exception as e:
+                print(f"Error loading global ranking from {args.global_ranking_path}: {e}")
+                print("Falling back to individual image rankings")
+                
+        dataset = RankedImageFolder(
+            root, rankings_dir, transform=transform, 
+            random_rankings=getattr(args, 'random_rankings', False),
+            global_ranking=global_ranking
+        )
         nb_classes = 200
         has_rankings = True  # RankedImageFolder always returns rankings
     
