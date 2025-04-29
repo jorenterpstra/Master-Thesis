@@ -37,11 +37,11 @@ export RDZV_PORT=29400
 
 # Select the GPUs with the least memory usage
 
-srun --ntasks=2 --nodes=1 --gpus-per-task=1 --export=ALL \
+torchrun --ntasks=2 --nodes=1 --gpus-per-task=1 \
     --rdzv_id=$SLURM_JOB_ID \
     --rdzv_backend=c10d \
     --rdzv_endpoint="$RDZV_HOST:$RDZV_PORT" \
-    python main.py \
+    main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 128 \

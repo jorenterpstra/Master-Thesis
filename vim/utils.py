@@ -229,7 +229,20 @@ def save_on_master(*args, **kwargs):
 
 
 def init_distributed_mode(args):
-    if 'SLURM_PROCID' in os.environ:
+    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        if args.debug:
+            print('Using environment variables for distributed configuration')
+        args.rank = int(os.environ["RANK"])
+        args.world_size = int(os.environ['WORLD_SIZE'])
+        
+        # IMPORTANT: Always set GPU index based on LOCAL_RANK for proper distribution
+        args.gpu = int(os.environ['LOCAL_RANK']) if 'LOCAL_RANK' in os.environ else args.rank % torch.cuda.device_count()
+        os.environ['RANK'] = str(args.rank)
+        os.environ['LOCAL_RANK'] = str(args.gpu)
+        os.environ['WORLD_SIZE'] = str(args.world_size)
+        if args.debug:
+            print(f"Process rank: {args.rank}, world size: {args.world_size}, using GPU: {args.gpu}")
+    elif 'SLURM_PROCID' in os.environ:
         if args.debug:
             print('Using SLURM')
         args.rank = int(os.environ['SLURM_PROCID'])
@@ -247,17 +260,6 @@ def init_distributed_mode(args):
         
         if args.debug:
             print(f"Process rank: {args.rank}, assigned to GPU: {args.gpu}")
-    elif 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-        if args.debug:
-            print('Using environment variables for distributed configuration')
-        args.rank = int(os.environ["RANK"])
-        args.world_size = int(os.environ['WORLD_SIZE'])
-        
-        # IMPORTANT: Always set GPU index based on LOCAL_RANK for proper distribution
-        args.gpu = int(os.environ['LOCAL_RANK']) if 'LOCAL_RANK' in os.environ else args.rank % torch.cuda.device_count()
-        
-        if args.debug:
-            print(f"Process rank: {args.rank}, world size: {args.world_size}, using GPU: {args.gpu}")
     else:
         if args.debug:
             print('Not using distributed mode')
