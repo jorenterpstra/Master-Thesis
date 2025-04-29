@@ -37,7 +37,7 @@ export RDZV_PORT=29400
 
 # Select the GPUs with the least memory usage
 
-torchrun --ntasks=2 --nodes=1 --gpus-per-task=1 \
+torchrun \
     --rdzv_id=$SLURM_JOB_ID \
     --rdzv_backend=c10d \
     --rdzv_endpoint="$RDZV_HOST:$RDZV_PORT" \
