@@ -1,0 +1,6 @@
+cd ../../scratch/6403840/Master-Thesis/vim
+
+source ~/.bashrc
+
+conda activate mamba
+

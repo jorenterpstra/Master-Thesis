@@ -22,7 +22,13 @@ conda activate mamba
 
 export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
+
 export NCCL_DEBUG=INFO
+export NCCL_SOCKET_IFNAME=eno8303  # Use the network interface shown in previous logs
+export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
+export NCCL_P2P_DISABLE=0         # Enable P2P if available
+export NCCL_SHM_DISABLE=0         # Enable shared memory
+export NCCL_BLOCKING_WAIT=1       # Use blocking synchronization
 export NCCL_ASYNC_ERROR_HANDLING=1
 export PYTHONUNBUFFERED=1
 
@@ -32,7 +38,7 @@ srun --ntasks=2 --nodes=1 --gpus-per-task=1 --export=ALL\
     python main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
-    --batch-size 64 \
+    --batch-size 128 \
     --drop-path 0.0 \
     --weight-decay 0.1 \
     --num_workers 16 \
