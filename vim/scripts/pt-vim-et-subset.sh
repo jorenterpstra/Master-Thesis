@@ -37,7 +37,7 @@ export RDZV_PORT=29400
 
 # Select the GPUs with the least memory usage
 
-torchrun \
+srun torchrun \
     --nproc_per_node=2 \
     --nnodes=1 \
     --node_rank=0 \
