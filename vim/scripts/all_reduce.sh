@@ -11,6 +11,17 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate mamba
 
+# to force SHM transport (no P2P):
+export NCCL_P2P_DISABLE=1
+export NCCL_SHM_DISABLE=0
+
+# or, to force socket transport only:
+# export NCCL_P2P_DISABLE=1
+# export NCCL_SHM_DISABLE=1
+
+export NCCL_DEBUG=INFO
+export NCCL_DEBUG_SUBSYS=ALL
+
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=29500
 python -m torch.distributed.run \
