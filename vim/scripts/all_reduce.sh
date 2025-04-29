@@ -6,6 +6,11 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --gpu-freq=medium # Request medium priority GPU access
 
+# Load modules
+module load cuda/11.8
+source ~/.bashrc
+conda activate mamba
+
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=29500
 python -m torch.distributed.run \
