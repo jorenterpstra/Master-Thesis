@@ -321,7 +321,7 @@ def init_distributed_mode(args):
         print(f"| Process {args.rank} passed all_reduce test", flush=True)
         
         # Replace standard barrier with timeout version
-        #torch.distributed.barrier()
+        torch.distributed.barrier()
         print(f'| Process {args.rank} passed barrier on GPU {args.gpu}', flush=True)
     except Exception as e:
         print(f"Error during barrier: {e}")

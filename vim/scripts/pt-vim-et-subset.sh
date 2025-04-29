@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gpu-freq=medium # Request medium priority GPU access
 
-export MASTER_ADDR=$(hostname)
+export MASTER_ADDR=$(scontrol show hostname ${SLURM_NODELIST} | head -n 1)
 export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
 export WORLD_SIZE=2
 
@@ -34,8 +34,7 @@ export PYTHONUNBUFFERED=1
 
 # Select the GPUs with the least memory usage
 
-srun --ntasks=2 --nodes=1 --gpus-per-task=1 --export=ALL\
-    python main.py \
+torchrun --nnodes=1 --nproc_per_node=2 --rdzv_id=100 --rdzv_backend=c10d --rdzv_endpoint=$MASTER_ADDR:29400 main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 128 \
