@@ -8,6 +8,8 @@
 
 export MASTER_ADDR=$(scontrol show hostname ${SLURM_NODELIST} | head -n 1)
 export MASTER_PORT=$(shuf -i 10000-65500 -n 1)
+export WORLD_SIZE=$((SLURM_NNODES * SLURM_NTASKS_PER_NODE))
+export SLURM_PROCID=$SLURM_PROCID
 
 echo "Setting up distributed environment:"
 echo "- MASTER_ADDR=$MASTER_ADDR"
