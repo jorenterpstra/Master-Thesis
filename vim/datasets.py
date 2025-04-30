@@ -299,18 +299,20 @@ def build_transform(is_train, args):
     if args.input_size > 32:  # Skip resize for small images like CIFAR
         t.append(transforms.Resize((args.input_size, args.input_size), interpolation=3))
     
-    # Non-spatial transformations
+    # Non-spatial transformations that work on PIL images
     if is_train and args.color_jitter > 0:
         t.append(transforms.ColorJitter(
             brightness=args.color_jitter,
             contrast=args.color_jitter,
             saturation=args.color_jitter))
         t.append(transforms.RandomGrayscale())
-        t.append(transforms.RandomErasing(p=args.reprob))
-        
     
     # Essential transformations
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
+    
+    # Transformations that require tensor input
+    if is_train and args.color_jitter > 0:
+        t.append(transforms.RandomErasing(p=args.reprob))
     
     return transforms.Compose(t)
