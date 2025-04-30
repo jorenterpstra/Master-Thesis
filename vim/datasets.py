@@ -309,7 +309,7 @@ def build_transform(is_train, args):
     
     # Add AutoAugment before converting to tensor since it works on PIL images
     if is_train and args.aa:
-        t.append(transforms.AutoAugment(interpolation=args.train_interpolation))
+        t.append(transforms.AutoAugment(interpolation=transforms.InterpolationMode.BILINEAR))
     
     # Essential transformations
     t.append(transforms.ToTensor())
