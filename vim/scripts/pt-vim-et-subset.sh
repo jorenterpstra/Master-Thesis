@@ -5,10 +5,6 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gpu-freq=medium # Request medium priority GPU access
 
-echo "Setting up distributed environment:"
-echo "- MASTER_ADDR=$MASTER_ADDR"
-echo "- MASTER_PORT=$MASTER_PORT"
-
 # Load modules
 module load cuda/11.8
 source ~/.bashrc
