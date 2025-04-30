@@ -307,6 +307,10 @@ def build_transform(is_train, args):
             saturation=args.color_jitter))
         t.append(transforms.RandomGrayscale())
     
+    # Add AutoAugment before converting to tensor since it works on PIL images
+    if is_train and args.aa:
+        t.append(transforms.AutoAugment(interpolation=args.train_interpolation))
+    
     # Essential transformations
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
@@ -314,8 +318,5 @@ def build_transform(is_train, args):
     # Transformations that require tensor input
     if is_train and args.reprob > 0:
         t.append(transforms.RandomErasing(p=args.reprob))
-    if is_train and args.aa:
-        t.append(transforms.AutoAugment(interpolation=args.train_interpolation))
         
-    
     return transforms.Compose(t)
