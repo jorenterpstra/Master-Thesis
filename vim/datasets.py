@@ -306,7 +306,7 @@ def build_transform(is_train, args):
             contrast=args.color_jitter,
             saturation=args.color_jitter))
         t.append(transforms.RandomGrayscale())
-        t.append(transforms.RandomErasing(p=args.random_erase_prob))
+        t.append(transforms.RandomErasing(p=args.reprob))
         
     
     # Essential transformations
