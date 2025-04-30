@@ -315,8 +315,7 @@ def build_transform(is_train, args):
     if is_train and args.reprob > 0:
         t.append(transforms.RandomErasing(p=args.reprob))
     if is_train and args.aa:
-        t.append(transforms.AutoAugment(policy=args.aa, 
-                                        interpolation=args.train_interpolation))
+        t.append(transforms.AutoAugment(interpolation=args.train_interpolation))
         
     
     return transforms.Compose(t)
