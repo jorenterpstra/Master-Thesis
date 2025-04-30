@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=vim-extra-tiny
 #SBATCH --time=10-00:00:00
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=4
 #SBATCH --gpu-freq=medium # Request medium priority GPU access
 
@@ -14,8 +14,8 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate mamba
 
-export OMP_NUM_THREADS=4
-export MKL_NUM_THREADS=4
+export OMP_NUM_THREADS=2
+export MKL_NUM_THREADS=2
 
 # export NCCL_DEBUG=INFO
 export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
@@ -30,7 +30,7 @@ export MASTER_PORT=29500
 
 # torchrun will set RANK, LOCAL_RANK, WORLD_SIZE, etc.
 python -m torch.distributed.run \
-    --nproc_per_node=4 \
+    --nproc_per_node=2 \
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
     main.py \
@@ -41,7 +41,7 @@ python -m torch.distributed.run \
     --weight-decay 0.1 \
     --num_workers 16 \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
-    --output_dir ./output/vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2_no_spatial_transforms_4gpu \
+    --output_dir ./output/vim_extra_tiny_spatial_transforms \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
