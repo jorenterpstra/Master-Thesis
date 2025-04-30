@@ -312,7 +312,11 @@ def build_transform(is_train, args):
     t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
     
     # Transformations that require tensor input
-    if is_train and args.color_jitter > 0:
+    if is_train and args.reprob > 0:
         t.append(transforms.RandomErasing(p=args.reprob))
+    if is_train and args.auto_augment:
+        t.append(transforms.AutoAugment(policy=args.aa, 
+                                        interpolation=args.train_interpolation))
+        
     
     return transforms.Compose(t)
