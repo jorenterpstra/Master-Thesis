@@ -314,7 +314,7 @@ def build_transform(is_train, args):
     # Transformations that require tensor input
     if is_train and args.reprob > 0:
         t.append(transforms.RandomErasing(p=args.reprob))
-    if is_train and args.auto_augment:
+    if is_train and args.aa:
         t.append(transforms.AutoAugment(policy=args.aa, 
                                         interpolation=args.train_interpolation))
         
