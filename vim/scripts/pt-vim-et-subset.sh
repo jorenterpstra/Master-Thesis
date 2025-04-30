@@ -9,7 +9,6 @@
 echo "Setting up distributed environment:"
 echo "- MASTER_ADDR=$MASTER_ADDR"
 echo "- MASTER_PORT=$MASTER_PORT"
-echo "- SLURM environment: SLURM_PROCID=$SLURM_PROCID, SLURM_LOCALID=$SLURM_LOCALID"
 
 # Load modules
 module load cuda/11.8
@@ -20,15 +19,12 @@ export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
 
 # export NCCL_DEBUG=INFO
-# export NCCL_SOCKET_IFNAME=eno8303  # Use the network interface shown in previous logs
-# export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
+export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
 export NCCL_P2P_DISABLE=1
 # export NCCL_SHM_DISABLE=0
 # export NCCL_BLOCKING_WAIT=1       # Use blocking synchronization
 # export NCCL_ASYNC_ERROR_HANDLING=1
 # export PYTHONUNBUFFERED=1
-
-# Select the GPUs with the least memory usage
 
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=29500
