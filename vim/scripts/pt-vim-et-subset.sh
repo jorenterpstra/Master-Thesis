@@ -32,7 +32,7 @@ python -m torch.distributed.run \
     main.py \
     --data-set IMNET \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
-    --batch-size 64 \
+    --batch-size 128 \
     --drop-path 0.0 \
     --weight-decay 0.1 \
     --num_workers 16 \
