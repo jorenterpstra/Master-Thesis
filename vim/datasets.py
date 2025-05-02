@@ -212,18 +212,16 @@ class RankedImageFolder(ImageFolder):
         """
         path, target = self.samples[index]
         image = self.loader(path)
-        if self.transform is not None:
-            image = self.transform(image)
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-            
+        
+        # Prepare ranking
         # Use global ranking if provided (this will be the fastest path)
         if self.global_ranking is not None:
-            ranking = self.global_ranking
+            ranking = self.global_ranking.clone()  # Clone to avoid modifying the original
         # Otherwise, use image-specific ranking
         elif path in self.rankings:
-            ranking = self.rankings[path]
+            ranking = self.rankings[path].clone()  # Clone to avoid modifying the original
         else:
+            # Create sequential ranking if not found
             ranking = torch.arange(self.total_patches, dtype=torch.long)
             # Only log warnings if we're not deliberately using random or global rankings
             if not self.random_rankings:
@@ -235,7 +233,23 @@ class RankedImageFolder(ImageFolder):
                 elif not hasattr(self, '_warning_count'):
                     self._warning_count = 1
                     self._log(f"No ranking found for {filename} in class {class_name}", "warning")
-                
+        
+        # Reshape ranking to [1, H, W] format for transforms
+        ranking = ranking.view(1, self.num_patches_per_dim, self.num_patches_per_dim)
+        
+        # Apply transforms
+        if self.transform is not None:
+            # Check if transform is our DualTransform
+            if hasattr(self.transform, '__call__') and 'ranking' in self.transform.__call__.__code__.co_varnames:
+                # This is a DualTransform - pass both image and ranking
+                image, ranking = self.transform(image, ranking)
+            else:
+                # Standard transform only for image
+                image = self.transform(image)
+        
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        
         if self.return_path:
             return image, target, ranking, path
         else:
@@ -292,31 +306,100 @@ def build_dataset(is_train, args):
 
 
 def build_transform(is_train, args):
-    """Build transforms with resize but no other spatial transformations."""
-    t = []
+    resize_im = args.input_size > 32
     
-    # Include resize to ensure proper input dimensions
-    if args.input_size > 32:  # Skip resize for small images like CIFAR
-        t.append(transforms.Resize((args.input_size, args.input_size), interpolation=3))
+    # Import our custom transforms
+    from transforms import DualTransforms, DualCenterCrop, DualResize, DualRandomResizedCrop
+    from torchvision.transforms import InterpolationMode
     
-    # Non-spatial transformations that work on PIL images
-    if is_train and args.color_jitter > 0:
-        t.append(transforms.ColorJitter(
-            brightness=args.color_jitter,
-            contrast=args.color_jitter,
-            saturation=args.color_jitter))
-        t.append(transforms.RandomGrayscale())
-    
-    # Add AutoAugment before converting to tensor since it works on PIL images
-    if is_train and args.aa:
-        t.append(transforms.AutoAugment(interpolation=transforms.InterpolationMode.BILINEAR))
-    
-    # Essential transformations
-    t.append(transforms.ToTensor())
-    t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
-    
-    # Transformations that require tensor input
-    if is_train and args.reprob > 0:
-        t.append(transforms.RandomErasing(p=args.reprob))
+    if is_train:
+        # Use DualTransforms with the same arguments as original create_transform
+        transform = DualTransforms(
+            size=args.input_size,
+            color_jitter=args.color_jitter,
+            auto_augment=args.aa,
+            interpolation=getattr(InterpolationMode, args.train_interpolation.upper(), InterpolationMode.BILINEAR),
+            re_prob=args.reprob,
+            re_mode=args.remode,
+            re_count=args.recount
+        )
         
-    return transforms.Compose(t)
+        if not resize_im:
+            # For small image datasets like CIFAR, implement special handling if needed
+            # In DualTransforms, we'd need to replace RandomCrop
+            pass
+            
+        return transform
+    
+    # For validation/testing - check if we need special handling for ranking tensors
+    has_rankings = getattr(args, 'has_rankings', {}).get('val', False)
+    
+    if has_rankings:
+        # Use dual transforms for validation when rankings are present
+        t = []
+        if resize_im:
+            # Calculate size exactly as in original code
+            size = int(args.input_size / args.eval_crop_ratio)
+            # Use DualResize with BICUBIC interpolation (matches original code's interpolation=3)
+            t.append(DualResize(size, interpolation=InterpolationMode.BICUBIC))
+            t.append(DualCenterCrop(args.input_size))
+
+        # Use standard normalization transforms 
+        # (these don't need dual versions since they only operate on image values, not spatial dimensions)
+        from transforms import ToTensorWithRanking, NormalizeWithRanking
+        t.append(ToTensorWithRanking())
+        t.append(NormalizeWithRanking(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
+        
+        # Custom Compose function that can handle (img, ranking) pairs
+        return DualCompose(t)
+    else:
+        # For validation without rankings, use standard torchvision transforms as in original code
+        t = []
+        if resize_im:
+            # Calculate size exactly as in original code
+            size = int(args.input_size / args.eval_crop_ratio)
+            t.append(transforms.Resize(size, interpolation=3))
+            t.append(transforms.CenterCrop(args.input_size))
+
+        t.append(transforms.ToTensor())
+        t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
+        
+        return transforms.Compose(t)
+
+# Custom transforms for validation that handle ranking tensors
+
+class ToTensorWithRanking:
+    def __call__(self, img, ranking=None):
+        if not isinstance(img, torch.Tensor):
+            img = transforms.ToTensor()(img)
+            
+        if ranking is not None:
+            return img, ranking
+        return img
+        
+class NormalizeWithRanking:
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+        self.normalize = transforms.Normalize(mean, std)
+        
+    def __call__(self, img, ranking=None):
+        img = self.normalize(img)
+        
+        if ranking is not None:
+            return img, ranking
+        return img
+
+class DualCompose:
+    def __init__(self, transforms):
+        self.transforms = transforms
+        
+    def __call__(self, img, ranking=None):
+        if ranking is not None:
+            for t in self.transforms:
+                img, ranking = t(img, ranking)
+            return img, ranking
+        else:
+            for t in self.transforms:
+                img = t(img)
+            return img
