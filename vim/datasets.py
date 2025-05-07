@@ -8,12 +8,17 @@ from pathlib import Path
 import torch
 import pickle
 import logging
+import numpy as np
+import cv2
 
 from torchvision import datasets, transforms
 from torchvision.datasets.folder import ImageFolder, default_loader, IMG_EXTENSIONS
 
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.data import create_transform
+from transforms import build_transform
+
+
 
 
 class INatDataset(ImageFolder):
@@ -161,7 +166,7 @@ class RankedImageFolder(ImageFolder):
             if not os.path.exists(ranking_file):
                 self._log(f"No ranking file found for class {class_name}", "warning")
                 continue
-            class_has_rankings = False
+            class_rank_heat_out = False
             class_loaded_count = 0
             with open(ranking_file, 'r') as f:
                 reader = csv.reader(f)
@@ -179,7 +184,7 @@ class RankedImageFolder(ImageFolder):
                             self.rankings[path] = ranking
                             total_loaded += 1
                             class_loaded_count += 1
-                            class_has_rankings = True
+                            class_rank_heat_out = True
                         except Exception as e:
                             self._log(f"Error parsing ranking for {image_filename} in {class_name}: {e}", "error")
                     else:
@@ -192,7 +197,7 @@ class RankedImageFolder(ImageFolder):
                             missing_rankings += 1
                             if missing_rankings <= 10:
                                 self._log(f"No image file matches '{image_filename}' from {class_name}'s rankings", "warning")
-            if not class_has_rankings:
+            if not class_rank_heat_out:
                 classes_with_missing.add(class_name)
             else:
                 self._log(f"  Class {class_name}: Loaded {class_loaded_count} rankings", "info")
@@ -254,11 +259,90 @@ class RankedImageFolder(ImageFolder):
             return image, target, ranking, path
         else:
             return image, target, ranking
+        
+
+class HeatmapImageFolder(ImageFolder):
+    """Dataset that loads images and their corresponding heatmaps from parallel directories"""
+    
+    def __init__(self, root, heatmap_root, transform=None, target_transform=None,
+                 loader=default_loader, heatmap_extension='.png', return_path=False):
+        super().__init__(root, transform=None, target_transform=target_transform, loader=loader)
+        self.heatmap_root = heatmap_root
+        self.heatmap_extension = heatmap_extension
+        self.transform = transform
+        self.return_path = return_path
+        self.heatmap_loader = loader  # Use the same loader for both image and heatmap
+        
+        # Verify heatmaps exist for some random samples
+        self._verify_heatmaps(10)
+    
+    def _verify_heatmaps(self, num_samples):
+        """Verify that heatmap files exist for some sample images"""
+        import random
+        indices = random.sample(range(len(self.samples)), min(num_samples, len(self.samples)))
+        missing = 0
+        
+        for idx in indices:
+            path, _ = self.samples[idx]
+            heatmap_path = self._get_heatmap_path(path)
+            if not os.path.exists(heatmap_path):
+                missing += 1
+                print(f"Warning: Missing heatmap for {path} at {heatmap_path}")
+        
+        if missing > 0:
+            print(f"Warning: {missing}/{num_samples} sample heatmaps not found.")
+        else:
+            print(f"Verified: {num_samples} sample heatmaps exist.")
+    
+    def _get_heatmap_path(self, image_path):
+        """Convert image path to corresponding heatmap path"""
+        rel_path = os.path.relpath(image_path, self.root)
+        base_path = os.path.splitext(rel_path)[0]
+        heatmap_path = os.path.join(self.heatmap_root, base_path + self.heatmap_extension)
+        return heatmap_path
+    
+    def __getitem__(self, index):
+        """Get image, heatmap, and target"""
+        path, target = self.samples[index]
+        
+        # Load image
+        image = self.loader(path)
+        
+        # Load heatmap as an image
+        heatmap_path = self._get_heatmap_path(path)
+        heatmap = self.heatmap_loader(heatmap_path)
+        
+        # Convert both to numpy for albumentations if needed
+        if not isinstance(image, np.ndarray):
+            image_np = np.array(image)
+        else:
+            image_np = image
+            
+        if not isinstance(heatmap, np.ndarray):
+            heatmap_np = np.array(heatmap)
+        else:
+            heatmap_np = heatmap
+            
+        # Apply transforms
+        if self.transform is not None:
+            transformed = self.transform(image=image_np, heatmap=heatmap_np)
+            image = transformed['image']
+            heatmap = transformed['heatmap']
+        
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        
+        if self.return_path:
+            return image, heatmap, target, path
+        else:
+            return image, heatmap, target
+        
 
 
 def build_dataset(is_train, args):
+    
     transform = build_transform(is_train, args)
-    has_rankings = False  # Default to no rankings
+    rank_heat_out = False  # Default to no rankings or heatmaps
 
     if args.data_set == 'CIFAR':
         dataset = datasets.CIFAR100(args.data_path, train=is_train, transform=transform)
@@ -295,111 +379,56 @@ def build_dataset(is_train, args):
             global_ranking=global_ranking
         )
         nb_classes = 200
-        has_rankings = True  # RankedImageFolder always returns rankings
+        rank_heat_out = True  # RankedImageFolder always returns rankings
+
+    elif args.data_set == 'IMNET_HEATMAP':
+        root = os.path.join(args.data_path, 'train' if is_train else 'val')
+        heatmap_root = os.path.join(args.heatmap_path, 'train' if is_train else 'val')
+        dataset = HeatmapImageFolder(
+            root, heatmap_root, transform=transform,
+            return_path=getattr(args, 'return_path', False)
+        )
+        nb_classes = 200
+        rank_heat_out = True
     
     # Set ranking flag in args for easy access across the codebase
-    if not hasattr(args, 'has_rankings'):
-        args.has_rankings = {}
-    args.has_rankings['train' if is_train else 'val'] = has_rankings
+    if not hasattr(args, 'rank_heat_out'):
+        args.rank_heat_out = {}
+    args.rank_heat_out['train' if is_train else 'val'] = rank_heat_out
 
     return dataset, nb_classes
 
 
-def build_transform(is_train, args):
-    resize_im = args.input_size > 32
-    
-    # Import our custom transforms
-    from transforms import DualTransforms, DualCenterCrop, DualResize, DualRandomResizedCrop
-    from torchvision.transforms import InterpolationMode
-    
-    if is_train:
-        # Use DualTransforms with the same arguments as original create_transform
-        transform = DualTransforms(
-            size=args.input_size,
-            color_jitter=args.color_jitter,
-            auto_augment=args.aa,
-            interpolation=getattr(InterpolationMode, args.train_interpolation.upper(), InterpolationMode.BILINEAR),
-            re_prob=args.reprob,
-            re_mode=args.remode,
-            re_count=args.recount
-        )
-        
-        if not resize_im:
-            # For small image datasets like CIFAR, implement special handling if needed
-            # In DualTransforms, we'd need to replace RandomCrop
-            pass
-            
-        return transform
-    
-    # For validation/testing - check if we need special handling for ranking tensors
-    has_rankings = getattr(args, 'has_rankings', {}).get('val', False)
-    
-    if has_rankings:
-        # Use dual transforms for validation when rankings are present
-        t = []
-        if resize_im:
-            # Calculate size exactly as in original code
-            size = int(args.input_size / args.eval_crop_ratio)
-            # Use DualResize with BICUBIC interpolation (matches original code's interpolation=3)
-            t.append(DualResize(size, interpolation=InterpolationMode.BICUBIC))
-            t.append(DualCenterCrop(args.input_size))
+# ==== Unused Code, replaced by build_transform ====
+# def build_transform(is_train, args):
+#     resize_im = args.input_size > 32
+#     if is_train:
+#         # this should always dispatch to transforms_imagenet_train
+#         transform = create_transform(
+#             input_size=args.input_size,
+#             is_training=True,
+#             color_jitter=args.color_jitter,
+#             auto_augment=args.aa,
+#             interpolation=args.train_interpolation,
+#             re_prob=args.reprob,
+#             re_mode=args.remode,
+#             re_count=args.recount,
+#         )
+#         if not resize_im:
+#             # replace RandomResizedCropAndInterpolation with
+#             # RandomCrop
+#             transform.transforms[0] = transforms.RandomCrop(
+#                 args.input_size, padding=4)
+#         return transform
 
-        # Use standard normalization transforms 
-        # (these don't need dual versions since they only operate on image values, not spatial dimensions)
-        from transforms import ToTensorWithRanking, NormalizeWithRanking
-        t.append(ToTensorWithRanking())
-        t.append(NormalizeWithRanking(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
-        
-        # Custom Compose function that can handle (img, ranking) pairs
-        return DualCompose(t)
-    else:
-        # For validation without rankings, use standard torchvision transforms as in original code
-        t = []
-        if resize_im:
-            # Calculate size exactly as in original code
-            size = int(args.input_size / args.eval_crop_ratio)
-            t.append(transforms.Resize(size, interpolation=3))
-            t.append(transforms.CenterCrop(args.input_size))
+#     t = []
+#     if resize_im:
+#         size = int(args.input_size / args.eval_crop_ratio)
+#         t.append(
+#             transforms.Resize(size, interpolation=3),  # to maintain same ratio w.r.t. 224 images
+#         )
+#         t.append(transforms.CenterCrop(args.input_size))
 
-        t.append(transforms.ToTensor())
-        t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
-        
-        return transforms.Compose(t)
-
-# Custom transforms for validation that handle ranking tensors
-
-class ToTensorWithRanking:
-    def __call__(self, img, ranking=None):
-        if not isinstance(img, torch.Tensor):
-            img = transforms.ToTensor()(img)
-            
-        if ranking is not None:
-            return img, ranking
-        return img
-        
-class NormalizeWithRanking:
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
-        self.normalize = transforms.Normalize(mean, std)
-        
-    def __call__(self, img, ranking=None):
-        img = self.normalize(img)
-        
-        if ranking is not None:
-            return img, ranking
-        return img
-
-class DualCompose:
-    def __init__(self, transforms):
-        self.transforms = transforms
-        
-    def __call__(self, img, ranking=None):
-        if ranking is not None:
-            for t in self.transforms:
-                img, ranking = t(img, ranking)
-            return img, ranking
-        else:
-            for t in self.transforms:
-                img = t(img)
-            return img
+#     t.append(transforms.ToTensor())
+#     t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
+#     return transforms.Compose(t)
