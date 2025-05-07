@@ -33,6 +33,9 @@ from utils import timer  # Import timer from utils now
 
 # log about
 import mlflow
+import cv2
+
+cv2.setNumThreads(0)
 
 
 def get_args_parser():
