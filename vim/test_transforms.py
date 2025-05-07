@@ -1,560 +1,372 @@
 import os
-import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torchvision.transforms import InterpolationMode, ToTensor
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
 import numpy as np
-import random
+import torch
+import matplotlib.pyplot as plt
+from PIL import Image
+import cv2
 import argparse
 from pathlib import Path
+import albumentations as A
+from torchvision.datasets.folder import ImageFolder, default_loader, IMG_EXTENSIONS
 
-from transforms import (DualTransforms, DualRandomResizedCrop, DualRandomHorizontalFlip, 
-                      DualResize, DualCenterCrop, ColorJitter, RandomErasing, AutoAugment,
-                      _has_unique_values, _preserve_ranking_values)
-from datasets import RankedImageFolder
+from transforms import build_transform, AlbumentationsRandAugment
+from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+from datasets import build_dataset, HeatmapImageFolder
 
-def setup_argparse():
-    parser = argparse.ArgumentParser(description='Test dual transforms with RankedImageFolder')
-    parser.add_argument('--data_path', type=str, default='path/to/data',
-                        help='Path to image dataset (train folder)')
-    parser.add_argument('--rankings_path', type=str, default='path/to/rankings',
-                        help='Path to rankings directory')
-    parser.add_argument('--batch_size', type=int, default=4, 
-                        help='Batch size for testing')
-    parser.add_argument('--use_global_ranking', action='store_true',
-                        help='Use a global ranking for all images')
-    parser.add_argument('--global_ranking_path', type=str, default=None,
-                        help='Path to global ranking if use_global_ranking is True')
-    parser.add_argument('--save_path', type=str, default='transform_test_results',
-                        help='Path to save test results')
-    return parser
+def denormalize(tensor, mean=IMAGENET_DEFAULT_MEAN, std=IMAGENET_DEFAULT_STD):
+    """Convert normalized tensor back to displayable image"""
+    mean = torch.tensor(mean).view(3, 1, 1)
+    std = torch.tensor(std).view(3, 1, 1)
+    return torch.clamp(tensor * std + mean, 0, 1)
 
-def create_mock_ranking(size=196, importance_pattern="default"):
-    """Create a mock ranking tensor with different patterns of importance."""
-    if importance_pattern == "default":
-        return torch.arange(size, dtype=torch.long)
-    elif importance_pattern == "center":
-        # Create center-focused ranking (center is most important)
-        grid_size = int(np.sqrt(size))
-        center_y, center_x = grid_size / 2, grid_size / 2
+def tensor_to_numpy(tensor):
+    """Convert torch tensor to numpy array for display"""
+    if tensor.ndim == 4:  # Batch of images
+        return tensor.permute(0, 2, 3, 1).cpu().numpy()
+    else:  # Single image
+        return tensor.permute(1, 2, 0).cpu().numpy()
+
+def create_sample_data(out_dir="sample_data", num_classes=3, imgs_per_class=5):
+    """Create a sample dataset with images and heatmaps for testing"""
+    images_root = os.path.join(out_dir, "images")
+    heatmaps_root = os.path.join(out_dir, "heatmaps")
+    
+    # Create class directories
+    for cls_idx in range(num_classes):
+        cls_name = f"class_{cls_idx}"
+        os.makedirs(os.path.join(images_root, cls_name), exist_ok=True)
+        os.makedirs(os.path.join(heatmaps_root, cls_name), exist_ok=True)
         
-        distances = []
-        for i in range(grid_size):
-            for j in range(grid_size):
-                dist = np.sqrt((i + 0.5 - center_y)**2 + (j + 0.5 - center_x)**2)
-                patch_idx = i * grid_size + j
-                distances.append((patch_idx, dist))
-        
-        # Sort by distance (closest first)
-        distances.sort(key=lambda x: x[1])
-        indices = [idx for idx, _ in distances]
-        return torch.tensor(indices, dtype=torch.long)
-    elif importance_pattern == "random":
-        return torch.randperm(size, dtype=torch.long)
-    else:
-        raise ValueError(f"Unknown importance pattern: {importance_pattern}")
-
-def visualize_image_with_ranking(image, ranking, filename, save_path):
-    """Visualize an image with its ranking overlay for debugging."""
-    # Convert image tensor to numpy for visualization
-    if isinstance(image, torch.Tensor):
-        img_np = image.permute(1, 2, 0).cpu().numpy()
-        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-    else:
-        # Handle PIL Image
-        to_tensor = ToTensor()
-        img_tensor = to_tensor(image)
-        img_np = img_tensor.permute(1, 2, 0).cpu().numpy()
-    
-    # Convert ranking to tensor if it's not already
-    if not isinstance(ranking, torch.Tensor):
-        ranking = torch.tensor(ranking)
-    
-    # Create a heatmap from the ranking
-    plt.figure(figsize=(20, 10))
-    
-    # Plot original image
-    plt.subplot(1, 2, 1)
-    plt.imshow(img_np)
-    plt.title('Original Image')
-    plt.axis('off')
-    
-    # Plot ranking heatmap overlay
-    plt.subplot(1, 2, 2)
-    plt.imshow(img_np)
-    plt.imshow(ranking.cpu().numpy()[0], alpha=0.6, cmap='viridis')
-    plt.title('Ranking Overlay')
-    plt.colorbar(label='Rank Order')
-    plt.axis('off')
-    
-    # Save the visualization
-    os.makedirs(save_path, exist_ok=True)
-    plt.savefig(os.path.join(save_path, filename))
-    plt.close()
-
-def check_tensor_uniqueness(tensor):
-    """Check if all values in tensor are unique."""
-    unique_values = torch.unique(tensor)
-    total_values = tensor.numel()
-    return len(unique_values) == total_values, len(unique_values), total_values
-
-def test_preserve_ranking_values():
-    """Test the _preserve_ranking_values function with different scenarios."""
-    print("\n=== Testing _preserve_ranking_values function ===")
-    
-    # Test case 1: Tensor with no duplicates
-    tensor1 = torch.arange(100).reshape(1, 10, 10)
-    restored1 = _preserve_ranking_values(tensor1)
-    is_identical = torch.all(restored1 == tensor1)
-    print(f"Case 1 - No duplicates: Preserved identical values = {is_identical}")
-    
-    # Test case 2: Tensor with some duplicates (simulating a transform)
-    tensor2 = torch.arange(100).reshape(1, 10, 10)
-    # Create duplicates by copying some values
-    tensor2[0, 2:4, 2:4] = tensor2[0, 0:2, 0:2]
-    unique_before = torch.unique(tensor2).shape[0]
-    
-    restored2 = _preserve_ranking_values(tensor2)
-    unique_after = torch.unique(restored2).shape[0]
-    
-    print(f"Case 2 - With duplicates: Unique values before={unique_before}, after={unique_after}")
-    print(f"         Values are integers: {restored2.dtype == torch.long}")
-    print(f"         All values unique: {len(torch.unique(restored2)) == restored2.numel()}")
-    
-    # Test case 3: Verify priority is maintained (lower values preserved)
-    tensor3 = torch.ones(1, 5, 5, dtype=torch.long)  # All ones
-    # Set some key positions with the value 1
-    tensor3[0, 0, 0] = 1  # Most important position
-    tensor3[0, 1, 1] = 1
-    tensor3[0, 2, 2] = 1
-    
-    restored3 = _preserve_ranking_values(tensor3)
-    
-    # Check if first occurrence of 1 is preserved
-    first_preserved = restored3[0, 0, 0] == 1
-    print(f"Case 3 - Priority preservation: First occurrence preserved = {first_preserved}")
-    print(f"         Other positions modified: {restored3[0, 1, 1] != 1 and restored3[0, 2, 2] != 1}")
-    print(f"         All values are integers: {restored3.dtype == torch.long}")
-    
-    # Test case 4: Verify that ranking meaning is preserved as much as possible
-    tensor4 = torch.zeros(1, 5, 5, dtype=torch.long)
-    # Most important patches (values 0-3)
-    tensor4[0, 0:2, 0:2] = torch.arange(4).reshape(2, 2)
-    # Create some duplicates
-    tensor4[0, 3:5, 3:5] = torch.arange(4).reshape(2, 2)
-    
-    restored4 = _preserve_ranking_values(tensor4)
-    
-    # Check if first occurrences are preserved
-    first_preserved = torch.all(restored4[0, 0:2, 0:2] == tensor4[0, 0:2, 0:2])
-    print(f"Case 4 - Meaning preservation: Important patches preserved = {first_preserved}")
-    print(f"         Duplicates modified: {not torch.all(restored4[0, 3:5, 3:5] == tensor4[0, 3:5, 3:5])}")
-    print(f"         All values are integers: {restored4.dtype == torch.long}")
-
-class PILToTensorTransform:
-    """
-    Transform that converts PIL Images to tensors for use in DataLoader.
-    This doesn't modify rankings and performs NO resizing.
-    """
-    def __init__(self):
-        self.to_tensor = ToTensor()
-    
-    def __call__(self, img, ranking=None, **kwargs):
-        if hasattr(img, 'convert'):  # Check if it's a PIL Image
-            # Convert to tensor without any resizing
-            img = self.to_tensor(img)
-        
-        if ranking is not None:
-            return img, ranking
-        return img
-
-def test_transforms_with_batches(data_loader, transforms_dual, save_path):
-    """Test transforms with batched data from data loader."""
-    os.makedirs(save_path, exist_ok=True)
-    
-    # Get one batch
-    for batch_idx, (images, targets, rankings, paths) in enumerate(data_loader):
-        print(f"Original batch shape: Images {images.shape}, Rankings {rankings.shape}")
-        
-        # Check original rankings uniqueness
-        batch_status = []
-        for i in range(rankings.size(0)):
-            is_unique, unique_count, total_count = check_tensor_uniqueness(rankings[i])
-            batch_status.append((is_unique, unique_count, total_count))
-            print(f"  Original ranking {i}: Unique={is_unique}, {unique_count}/{total_count} unique values")
-        
-        # Apply transforms to the batch - we need to do this individually since our transform accepts (img, ranking) pairs
-        transformed_images = []
-        transformed_rankings = []
-        
-        for i in range(images.size(0)):
-            img, rank = transforms_dual(images[i], rankings[i])
-            transformed_images.append(img)
-            transformed_rankings.append(rank)
+        # Create sample images and heatmaps
+        for img_idx in range(imgs_per_class):
+            img_name = f"image_{img_idx}"
             
-            # Check transformed ranking uniqueness
-            is_unique, unique_count, total_count = check_tensor_uniqueness(rank)
-            print(f"  Transformed ranking {i}: Unique={is_unique}, {unique_count}/{total_count} unique values")
+            # Create a sample image with patterns
+            img = np.ones((224, 224, 3), dtype=np.uint8) * 128
             
-            # Visualize original and transformed
-            img_filename = f"batch{batch_idx}_img{i}_original.png"
-            visualize_image_with_ranking(images[i], rankings[i], img_filename, save_path)
+            # Add some patterns based on class and index for visual distinction
+            cv2.rectangle(img, (50, 50), (150, 150), (200, 100 + cls_idx*30, 100), -1)
+            cv2.circle(img, (160, 160), 40 + img_idx*5, (100, 200, 100 + img_idx*30), -1)
             
-            trans_filename = f"batch{batch_idx}_img{i}_transformed.png"
-            visualize_image_with_ranking(img, rank, trans_filename, save_path)
-        
-        # Stack back into batches
-        transformed_images = torch.stack(transformed_images)
-        transformed_rankings = torch.stack(transformed_rankings)
-        
-        print(f"Transformed batch shape: Images {transformed_images.shape}, Rankings {transformed_rankings.shape}")
-        
-        # Only process one batch for this test
-        break
+            # Add a grid pattern
+            for i in range(0, 224, 32):
+                cv2.line(img, (0, i), (223, i), (200, 200, 200), 1)
+                cv2.line(img, (i, 0), (i, 223), (200, 200, 200), 1)
+            
+            # Create corresponding heatmap (14x14 for a 224x224 image with patch_size=16)
+            heatmap = np.zeros((14, 14), dtype=np.float32)
+            
+            # Add a pattern to heatmap (different for each image)
+            cx, cy = img_idx % 4 + 5, cls_idx * 3 + 3  # Center coords vary by image and class
+            for i in range(14):
+                for j in range(14):
+                    # Distance-based pattern
+                    dist = np.sqrt((i - cx)**2 + (j - cy)**2)
+                    heatmap[i, j] = max(0, 1 - dist/8)
+            
+            # Save the image
+            img_path = os.path.join(images_root, cls_name, f"{img_name}.jpg")
+            cv2.imwrite(img_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+            
+            # Resize heatmap to match image size (224x224)
+            heatmap_resized = cv2.resize(heatmap, (224, 224), interpolation=cv2.INTER_LINEAR)
+            
+            # Convert heatmap to an image (scale to 0-255 and convert to uint8)
+            heatmap_img = (heatmap_resized * 255).astype(np.uint8)
+            
+            # Save the heatmap as an image instead of .npy
+            heatmap_path = os.path.join(heatmaps_root, cls_name, f"{img_name}.png")
+            cv2.imwrite(heatmap_path, heatmap_img)
+    
+    print(f"Created sample dataset with {num_classes} classes and {imgs_per_class} images each")
+    return images_root, heatmaps_root
 
-def test_transforms_individually(data_loader, save_path):
-    """Test each transform individually to identify which might cause issues."""
-    transforms_to_test = [
-        ("RandomResizedCrop", DualRandomResizedCrop(size=224, interpolation=InterpolationMode.BILINEAR)),
-        ("RandomHorizontalFlip", DualRandomHorizontalFlip(p=1.0)),  # p=1.0 to ensure it applies
-        ("Resize", DualResize(size=224, interpolation=InterpolationMode.BILINEAR)),
-        ("CenterCrop", DualCenterCrop(size=196)),
-        ("ColorJitter", ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.2)),
-        ("RandomErasing", RandomErasing(p=1.0, scale=(0.02, 0.33), ratio=(0.3, 3.3))), 
-        ("AutoAugment_Rotate", lambda img, rank: AutoAugment()._rotate(img, rank, 1.0)),
-        ("AutoAugment_ShearX", lambda img, rank: AutoAugment()._shear_x(img, rank, 1.0)),
-        ("AutoAugment_ShearY", lambda img, rank: AutoAugment()._shear_y(img, rank, 1.0)),
-        ("AutoAugment_TranslateX", lambda img, rank: AutoAugment()._translate_x(img, rank, 1.0)),
-        ("AutoAugment_TranslateY", lambda img, rank: AutoAugment()._translate_y(img, rank, 1.0)),
-        ("AutoAugment_Full", AutoAugment(policy_name='rand-m9-mstd0.5-inc1')),
+def test_transforms_with_dataset(images_root, heatmaps_root, output_dir="transform_results"):
+    """Test transforms with the dataset"""
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Define test configurations
+    test_configs = [
+        {"name": "basic", "args": {"input_size": 224, "color_jitter": 0, "aa": None, "reprob": 0, "eval_crop_ratio": 1.0}},
+        {"name": "color_jitter", "args": {"input_size": 224, "color_jitter": 0.4, "aa": None, "reprob": 0, "eval_crop_ratio": 1.0}},
+        {"name": "rand_augment", "args": {"input_size": 224, "color_jitter": 0, "aa": "rand-m9-mstd0.5", "reprob": 0, "eval_crop_ratio": 1.0}},
+        {"name": "full_augment", "args": {"input_size": 224, "color_jitter": 0.4, "aa": "rand-m9-mstd0.5", "reprob": 0.25, "recount": 1, "eval_crop_ratio": 1.0}}
     ]
-    
-    os.makedirs(save_path, exist_ok=True)
-    
-    # Get one image
-    for batch_idx, (images, targets, rankings, paths) in enumerate(data_loader):
-        # Just use the first image
-        img, ranking = images[0], rankings[0]
-        
-        # Original uniqueness check
-        is_unique, unique_count, total_count = check_tensor_uniqueness(ranking)
-        print(f"Original: Unique={is_unique}, {unique_count}/{total_count} unique values")
-        
-        # Test each transform
-        for name, transform in transforms_to_test:
-            test_folder = os.path.join(save_path, name)
-            os.makedirs(test_folder, exist_ok=True)
-            
-            # Apply transform
-            try:
-                transformed_img, transformed_ranking = transform(img.clone(), ranking.clone())
-                
-                # Check uniqueness
-                is_unique, unique_count, total_count = check_tensor_uniqueness(transformed_ranking)
-                print(f"{name}: Unique={is_unique}, {unique_count}/{total_count} unique values")
-                
-                # Visualize
-                visualize_image_with_ranking(img, ranking, "original.png", test_folder)
-                visualize_image_with_ranking(transformed_img, transformed_ranking, "transformed.png", test_folder)
-                
-                # If not unique, restore uniqueness and visualize again
-                if not is_unique:
-                    restored_ranking = _preserve_ranking_values(transformed_ranking)
-                    is_unique, unique_count, total_count = check_tensor_uniqueness(restored_ranking)
-                    print(f"{name} (Restored): Unique={is_unique}, {unique_count}/{total_count} unique values")
-                    
-                    # Check if we preserved integer values
-                    is_int_type = restored_ranking.dtype == torch.long
-                    print(f"{name} (Restored): Integer values preserved = {is_int_type}")
-                    
-                    # Visualize restored ranking
-                    visualize_image_with_ranking(transformed_img, restored_ranking, "restored.png", test_folder)
-                
-                    # Analyze changes to verify ranking integrity
-                    analyze_ranking_changes(ranking, transformed_ranking, restored_ranking, name, test_folder)
-                
-            except Exception as e:
-                print(f"Error testing {name}: {e}")
-        
-        # Only process one image
-        break
-
-def analyze_ranking_changes(original, transformed, restored, transform_name, save_path):
-    """Analyze how much the rankings change before and after restoration."""
-    # Flatten tensors for analysis
-    orig_flat = original.view(-1).cpu().numpy()
-    trans_flat = transformed.view(-1).cpu().numpy()
-    rest_flat = restored.view(-1).cpu().numpy()
-    
-    # Count preserved values (percentage of values that remain the same)
-    preserved_count = np.sum(trans_flat == orig_flat)
-    preserved_pct = preserved_count / len(orig_flat) * 100
-    
-    # Count preserved values after restoration
-    preserved_after_count = np.sum(rest_flat == orig_flat)
-    preserved_after_pct = preserved_after_count / len(orig_flat) * 100
-    
-    # Calculate Spearman rank correlation
-    try:
-        from scipy.stats import spearmanr
-        corr_trans, _ = spearmanr(orig_flat, trans_flat)
-        corr_rest, _ = spearmanr(orig_flat, rest_flat)
-    except:
-        corr_trans, corr_rest = 0, 0
-    
-    # Print analysis
-    print(f"\nRanking analysis for {transform_name}:")
-    print(f"  Preserved values: {preserved_pct:.1f}% ({preserved_count}/{len(orig_flat)})")
-    print(f"  Preserved after restoration: {preserved_after_pct:.1f}% ({preserved_after_count}/{len(orig_flat)})")
-    print(f"  Rank correlation: Original-Transformed={corr_trans:.3f}, Original-Restored={corr_rest:.3f}")
-    
-    # Create visualization of changes
-    plt.figure(figsize=(15, 5))
-    
-    plt.subplot(1, 3, 1)
-    plt.scatter(np.arange(len(orig_flat)), orig_flat, alpha=0.5)
-    plt.title('Original Rankings')
-    plt.xlabel('Position')
-    plt.ylabel('Rank Value')
-    
-    plt.subplot(1, 3, 2)
-    plt.scatter(np.arange(len(trans_flat)), trans_flat, alpha=0.5)
-    plt.title(f'Transformed Rankings\n(Preserved: {preserved_pct:.1f}%)')
-    plt.xlabel('Position')
-    plt.ylabel('Rank Value')
-    
-    plt.subplot(1, 3, 3)
-    plt.scatter(np.arange(len(rest_flat)), rest_flat, alpha=0.5)
-    plt.title(f'Restored Rankings\n(Preserved: {preserved_after_pct:.1f}%)')
-    plt.xlabel('Position')
-    plt.ylabel('Rank Value')
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(save_path, "ranking_analysis.png"))
-    plt.close()
-
-def test_sequential_transforms(data_loader, save_path):
-    """Test sequences of transforms to verify they properly maintain ranking uniqueness."""
-    print("\n=== Testing transform sequences ===")
-    
-    # Define transform sequences to test
-    transform_sequences = [
-        ("resize_then_crop", 
-         [DualResize(size=256), DualCenterCrop(size=224)]),
-        
-        ("crop_then_flip", 
-         [DualRandomResizedCrop(size=224), DualRandomHorizontalFlip(p=1.0)]),
-        
-        ("complex_sequence",
-         [DualResize(size=256), DualCenterCrop(size=224), 
-          DualRandomHorizontalFlip(p=1.0), AutoAugment(policy_name='rand-m9-mstd0.5')]),
-    ]
-    
-    os.makedirs(save_path, exist_ok=True)
-    
-    # Get one image
-    for batch_idx, (images, targets, rankings, paths) in enumerate(data_loader):
-        # Just use the first image
-        img, ranking = images[0], rankings[0]
-        
-        # Test each sequence
-        for name, transforms_list in transform_sequences:
-            print(f"\nTesting transform sequence: {name}")
-            
-            sequence_folder = os.path.join(save_path, name)
-            os.makedirs(sequence_folder, exist_ok=True)
-            
-            # Visualize original
-            visualize_image_with_ranking(img, ranking, "0_original.png", sequence_folder)
-            
-            # Apply transforms sequentially
-            current_img, current_ranking = img.clone(), ranking.clone()
-            
-            for i, transform in enumerate(transforms_list, 1):
-                try:
-                    # Apply transform
-                    current_img, current_ranking = transform(current_img, current_ranking)
-                    
-                    # Check uniqueness
-                    is_unique, unique_count, total_count = check_tensor_uniqueness(current_ranking)
-                    print(f"  Step {i}: Unique={is_unique}, {unique_count}/{total_count} unique values")
-                    
-                    # If not unique, restore uniqueness
-                    if not is_unique:
-                        current_ranking = _preserve_ranking_values(current_ranking)
-                        is_unique, unique_count, total_count = check_tensor_uniqueness(current_ranking)
-                        print(f"  Step {i} (Restored): Unique={is_unique}, {unique_count}/{total_count} unique values")
-                    
-                    # Visualize intermediate result
-                    visualize_image_with_ranking(
-                        current_img, current_ranking, 
-                        f"{i}_{transform.__class__.__name__}.png", 
-                        sequence_folder
-                    )
-                    
-                except Exception as e:
-                    print(f"  Error in step {i}: {e}")
-                    break
-            
-            # Analyze final result compared to original
-            analyze_ranking_changes(
-                ranking, current_ranking, current_ranking,
-                f"{name}_final", sequence_folder
-            )
-        
-        # Only process one image
-        break
-
-def test_ranking_pattern_preservation(data_loader, save_path):
-    """Test if different initial ranking patterns are preserved after transforms."""
-    print("\n=== Testing ranking pattern preservation ===")
-    
-    # Create different ranking patterns
-    patterns = {
-        "default": create_mock_ranking(196, "default"),
-        "center": create_mock_ranking(196, "center"),
-        "random": create_mock_ranking(196, "random"),
-    }
-    
-    # Define transforms to test
-    transforms_to_test = [
-        ("resize_crop", DualRandomResizedCrop(size=224)),
-        ("flip", DualRandomHorizontalFlip(p=1.0)),
-        ("rotate", lambda img, rank: AutoAugment()._rotate(img, rank, 0.5)),
-    ]
-    
-    os.makedirs(save_path, exist_ok=True)
-    
-    # Get one image
-    for batch_idx, (images, targets, rankings, paths) in enumerate(data_loader):
-        # Just use the first image and repeat tests with different ranking patterns
-        img = images[0]
-        
-        for pattern_name, pattern_ranking in patterns.items():
-            pattern_folder = os.path.join(save_path, pattern_name)
-            os.makedirs(pattern_folder, exist_ok=True)
-            
-            # Reshape pattern to match expected shape and ensure it's on the same device as image
-            shaped_ranking = pattern_ranking.reshape(1, 14, 14).to(img.device)
-            
-            # Visualize original
-            visualize_image_with_ranking(img, shaped_ranking, "original.png", pattern_folder)
-            
-            # Test transforms
-            for transform_name, transform in transforms_to_test:
-                test_folder = os.path.join(pattern_folder, transform_name)
-                os.makedirs(test_folder, exist_ok=True)
-                
-                try:
-                    # Apply transform
-                    trans_img, trans_ranking = transform(img.clone(), shaped_ranking.clone())
-                    
-                    # Check uniqueness
-                    is_unique, unique_count, total_count = check_tensor_uniqueness(trans_ranking)
-                    print(f"{pattern_name}-{transform_name}: Unique={is_unique}, {unique_count}/{total_count}")
-                    
-                    # Visualize
-                    visualize_image_with_ranking(trans_img, trans_ranking, "transformed.png", test_folder)
-                    
-                    # If not unique, restore and visualize again
-                    if not is_unique:
-                        restored = _preserve_ranking_values(trans_ranking)
-                        visualize_image_with_ranking(trans_img, restored, "restored.png", test_folder)
-                        
-                        # Analyze pattern preservation
-                        analyze_ranking_changes(shaped_ranking, trans_ranking, restored, 
-                                              f"{pattern_name}-{transform_name}", test_folder)
-                    else:
-                        # Still analyze changes
-                        analyze_ranking_changes(shaped_ranking, trans_ranking, trans_ranking, 
-                                              f"{pattern_name}-{transform_name}", test_folder)
-                
-                except Exception as e:
-                    print(f"Error testing {pattern_name}-{transform_name}: {e}")
-        
-        # Only process one image
-        break
-
-def test_full_pipeline_with_dataloader(args):
-    """Test the full pipeline with dataloader and batch processing."""
-    # Setup save paths
-    save_path = Path(args.save_path)
-    save_path.mkdir(exist_ok=True, parents=True)
-    
-    # First, test the _preserve_ranking_values function independently
-    test_preserve_ranking_values()
-    
-    # Load a global ranking if specified
-    global_ranking = None
-    if args.use_global_ranking:
-        if args.global_ranking_path:
-            try:
-                global_ranking = torch.load(args.global_ranking_path)
-                print(f"Using global ranking from {args.global_ranking_path}")
-            except Exception as e:
-                print(f"Error loading global ranking: {e}")
-                global_ranking = create_mock_ranking()
-                print("Using mock global ranking instead")
-        else:
-            global_ranking = create_mock_ranking()
-            print("Using mock global ranking (no path provided)")
-    
-    # Create dual transforms
-    transforms_dual = DualTransforms(
-        size=224,
-        color_jitter=0.4,
-        auto_augment='rand-m9-mstd0.5-inc1',
-        interpolation=InterpolationMode.BILINEAR,
-        re_prob=0.25,
-        re_mode='pixel',
-        re_count=1
-    )
-    
-    # Create basic transform to convert PIL images to tensors
-    basic_transform = PILToTensorTransform()
     
     # Create dataset
-    dataset = RankedImageFolder(
-        root=args.data_path,
-        rankings_dir=args.rankings_path,
-        transform=basic_transform,  # Add basic transform to convert PIL to tensor
-        random_rankings=False,
-        global_ranking=global_ranking,
-        return_path=True
+    dataset = HeatmapImageFolder(images_root, heatmaps_root, transform=None, return_path=True)
+    
+    # Test each transform configuration
+    for config in test_configs:
+        print(f"Testing {config['name']} transform...")
+        
+        # Create args namespace
+        args = argparse.Namespace(**config["args"])
+        
+        # Create transforms for training and validation
+        train_transform = build_transform(is_train=True, args=args)
+        val_transform = build_transform(is_train=False, args=args)
+        
+        # Apply to some samples
+        num_samples = min(3, len(dataset))
+        
+        fig, axes = plt.subplots(num_samples, 4, figsize=(16, 4*num_samples))
+        if num_samples == 1:
+            axes = axes.reshape(1, -1)
+        
+        for i in range(num_samples):
+            # Get a sample
+            image, heatmap, _, path = dataset[i]
+            
+            # convert original image for display
+            if isinstance(image, torch.Tensor):
+                orig_img_disp = denormalize(image)
+                orig_img_disp = tensor_to_numpy(orig_img_disp)
+            else:
+                orig_img_disp = image
+            
+            # convert original heatmap for display
+            if isinstance(heatmap, torch.Tensor):
+                orig_heatmap_disp = heatmap.squeeze().numpy()
+            else:
+                orig_heatmap_disp = heatmap
+            
+            # Apply train transform
+            dataset.transform = train_transform
+            train_img, train_heatmap, _, _ = dataset[i]
+            
+            # Apply val transform
+            dataset.transform = val_transform
+            val_img, val_heatmap, _, _ = dataset[i]
+            
+            # Convert tensors for display if needed
+            if isinstance(train_img, torch.Tensor):
+                train_img_disp = denormalize(train_img)
+                train_img_disp = tensor_to_numpy(train_img_disp)
+            else:
+                train_img_disp = train_img
+                
+            if isinstance(val_img, torch.Tensor):
+                val_img_disp = denormalize(val_img)
+                val_img_disp = tensor_to_numpy(val_img_disp)
+            else:
+                val_img_disp = val_img
+                
+            if isinstance(train_heatmap, torch.Tensor):
+                train_heatmap_disp = train_heatmap.squeeze().numpy()
+            else:
+                train_heatmap_disp = train_heatmap
+                
+            if isinstance(val_heatmap, torch.Tensor):
+                val_heatmap_disp = val_heatmap.squeeze().numpy()
+            else:
+                val_heatmap_disp = val_heatmap
+            
+            # Plot
+            axes[i, 0].imshow(orig_img_disp)
+            axes[i, 0].set_title(f"Original Image {i+1}")
+            axes[i, 0].axis('off')
+            
+            axes[i, 1].imshow(orig_heatmap_disp, cmap='viridis')
+            axes[i, 1].set_title(f"Original Heatmap {i+1}")
+            axes[i, 1].axis('off')
+            
+            axes[i, 2].imshow(train_img_disp)
+            axes[i, 2].set_title(f"Train Transform")
+            axes[i, 2].axis('off')
+            
+            axes[i, 3].imshow(train_heatmap_disp, cmap='viridis')
+            axes[i, 3].set_title(f"Train Heatmap")
+            axes[i, 3].axis('off')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f"{config['name']}_transforms.png"))
+        plt.close(fig)
+        
+        # Reset dataset transform
+        dataset.transform = None
+    
+    print(f"Transform tests completed. Results saved to {output_dir}.")
+
+def test_rand_augment_variations(images_root, heatmaps_root, output_dir="rand_augment_results"):
+    """Test different RandAugment configurations"""
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Create dataset
+    dataset = HeatmapImageFolder(images_root, heatmaps_root, transform=None, return_path=True)
+    
+    # Test sample image with multiple augment applications
+    sample_idx = 0
+    img, heatmap, _, _ = dataset[sample_idx]
+    
+    # Convert to numpy for albumentations
+    if not isinstance(img, np.ndarray):
+        img_np = np.array(img)
+    else:
+        img_np = img
+    
+    # Test different RandAugment configs
+    rand_augment_configs = [
+        {"name": "m5_std0", "magnitude": 5, "std": 0},
+        {"name": "m9_std0.5", "magnitude": 9, "std": 0.5},
+        {"name": "m15_std0.5", "magnitude": 15, "std": 0.5}
+    ]
+    
+    # Apply each transform multiple times to see variety
+    num_repeats = 5
+    
+    for config in rand_augment_configs:
+        print(f"Testing RandAugment with {config['name']}...")
+        
+        # Create RandAugment transform
+        rand_augment = AlbumentationsRandAugment(
+            num_ops=2,
+            magnitude=config["magnitude"],
+            std=config["std"]
+        )
+        
+        fig, axes = plt.subplots(num_repeats, 2, figsize=(8, 4*num_repeats))
+        
+        # Show original first
+        fig.suptitle(f"RandAugment {config['name']}", fontsize=16)
+        
+        # Apply transform multiple times
+        for i in range(num_repeats):
+            # Force apply the transform
+            result = rand_augment(image=img_np.copy(), heatmap=heatmap.copy(), force_apply=True)
+            aug_img = result["image"]
+            aug_heatmap = result["heatmap"]
+            
+            # Plot
+            axes[i, 0].imshow(aug_img)
+            axes[i, 0].set_title(f"Image Sample {i+1}")
+            axes[i, 0].axis('off')
+            
+            axes[i, 1].imshow(aug_heatmap, cmap='viridis')
+            axes[i, 1].set_title(f"Heatmap Sample {i+1}")
+            axes[i, 1].axis('off')
+            
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.95)
+        plt.savefig(os.path.join(output_dir, f"{config['name']}_variations.png"))
+        plt.close(fig)
+    
+    print(f"RandAugment variation tests completed. Results saved to {output_dir}.")
+
+def test_ImageFolder_compatibility():
+    """Test that transforms work with regular ImageFolder too"""
+    # Create sample data
+    data_dir, _ = create_sample_data("image_folder_test", num_classes=2, imgs_per_class=3)
+    
+    # Create args
+    args = argparse.Namespace(
+        input_size=224,
+        color_jitter=0.4,
+        aa="rand-m9-mstd0.5",
+        reprob=0.25,
+        recount=1,
+        eval_crop_ratio=1.0
     )
     
-    # Create dataloader
-    data_loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=0
-    )
+    # Build transform
+    transform = build_transform(is_train=True, args=args)
     
-    print(f"Dataset size: {len(dataset)} images")
+    # Create regular ImageFolder dataset
+    dataset = ImageFolder(data_dir, transform=transform)
     
-    # Run specific test sets
-    print("\n=== Running transform tests ===")
+    # Test loading a few samples
+    for i in range(min(3, len(dataset))):
+        # This should work without errors
+        img, target = dataset[i]
+        print(f"Successfully loaded image {i} with target {target}")
+        if isinstance(img, torch.Tensor):
+            print(f"Image shape: {img.shape}, dtype: {img.dtype}")
+        else:
+            print(f"Image shape: {img.shape}, dtype: {img.dtype}")
     
-    # Test individual transforms
-    test_transforms_individually(data_loader, save_path / "individual_tests")
-    
-    # Test transform sequences
-    test_sequential_transforms(data_loader, save_path / "sequential_tests")
-    
-    # Test with different ranking patterns
-    test_ranking_pattern_preservation(data_loader, save_path / "pattern_tests")
-    
-    # Test transforms with batches
-    test_transforms_with_batches(data_loader, transforms_dual, save_path / "batch_tests")
-    
-    print("\nTransform testing complete! Check the output directories for visualizations.")
+    print("ImageFolder compatibility test passed!")
+
+def test_single_image(image_path, heatmap_path, args, output_dir="single_image_results"):
+    """Test all transforms on one image (and optional heatmap) and save visualizations."""
+    os.makedirs(output_dir, exist_ok=True)
+    # load image and heatmap
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    heatmap = None
+    if heatmap_path:
+        hm = cv2.imread(heatmap_path, cv2.IMREAD_UNCHANGED)
+        if hm is None:
+            raise ValueError(f"Could not load heatmap from {heatmap_path}")
+        heatmap = hm if hm.ndim==2 else hm[:,:,0]
+    # reuse same configs
+    test_configs = [
+        {"name": "basic",     "args": {"input_size":224,"color_jitter":0,"aa":None,"reprob":0,"eval_crop_ratio":1.0}},
+        {"name": "color_jitter","args":{"input_size":224,"color_jitter":0.4,"aa":None,"reprob":0,"eval_crop_ratio":1.0}},
+        {"name": "rand_augment","args":{"input_size":224,"color_jitter":0,"aa":"rand-m9-mstd0.5","reprob":0,"eval_crop_ratio":1.0}},
+        {"name": "full_augment","args":{"input_size":224,"color_jitter":0.4,"aa":"rand-m9-mstd0.5","reprob":0.25,"recount":1,"eval_crop_ratio":1.0}},
+    ]
+    for cfg in test_configs:
+        cfg_args = argparse.Namespace(**cfg["args"])
+        train_t = build_transform(is_train=True,  args=cfg_args)
+        val_t   = build_transform(is_train=False, args=cfg_args)
+        # apply train
+        if heatmap is not None:
+            tr = train_t(image=img.copy(), heatmap=heatmap.copy())
+            vr = val_t(image=img.copy(), heatmap=heatmap.copy())
+            tr_img, tr_hm = tr["image"], tr["heatmap"]
+            vr_img, vr_hm = vr["image"], vr["heatmap"]
+        else:
+            tr_img = train_t(image=img.copy())["image"]
+            vr_img = val_t(image=img.copy())["image"]
+            tr_hm = vr_hm = None
+        # convert tensors for display
+        def prep(x):
+            if isinstance(x, torch.Tensor):
+                return tensor_to_numpy(denormalize(x))
+            return x
+        tr_img, vr_img = prep(tr_img), prep(vr_img)
+        # plot
+        cols = 3 if heatmap is None else 3
+        rows = 1 if heatmap is None else 2
+        fig, axes = plt.subplots(rows, cols, figsize=(4*cols,4*rows))
+        ax = axes if rows==1 else axes.flatten()
+        ax[0].imshow(img);     ax[0].set_title("Original");   ax[0].axis("off")
+        ax[1].imshow(tr_img);  ax[1].set_title("Train");      ax[1].axis("off")
+        ax[2].imshow(vr_img);  ax[2].set_title("Val");        ax[2].axis("off")
+        if heatmap is not None:
+            ax[3].imshow(heatmap, cmap="viridis");    ax[3].set_title("Orig HM");      ax[3].axis("off")
+            ax[4].imshow(tr_hm,    cmap="viridis");    ax[4].set_title("Train HM");     ax[4].axis("off")
+            ax[5].imshow(vr_hm,    cmap="viridis");    ax[5].set_title("Val HM");       ax[5].axis("off")
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f"single_{cfg['name']}.png"))
+        plt.close(fig)
 
 if __name__ == "__main__":
-    parser = setup_argparse()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--images_dir",
+                        default=r"C:\Users\joren\Documents\_Uni\Master\Thesis\imagenet_subset\train")
+    parser.add_argument("--heatmaps_dir",
+                        default=r"C:\Users\joren\Documents\_Uni\Master\Thesis\imagenet_subset\train_heat")
+    parser.add_argument("--image",
+                        default=r"C:\Users\joren\Documents\_Uni\Master\Thesis\imagenet_subset\train\n02500267\n02500267_6113.JPEG",
+                        help="Path to single image to test")
+    parser.add_argument("--heatmap",
+                        default=r"C:\Users\joren\Documents\_Uni\Master\Thesis\imagenet_subset\train_heat\n02500267\n02500267_6113.JPEG",
+                        help="Corresponding heatmap for the single image")
+    parser.add_argument("--output_dir",      default="transform_results")
+    parser.add_argument("--rand_output_dir", default="rand_augment_results")
+    parser.add_argument("--single_output_dir", default="single_image_results")
     args = parser.parse_args()
-    
-    # Run the test
-    test_full_pipeline_with_dataloader(args)
+
+    # test on full dataset
+    test_transforms_with_dataset(args.images_dir, args.heatmaps_dir,
+                                 output_dir=args.output_dir)
+    test_rand_augment_variations(args.images_dir, args.heatmaps_dir,
+                                 output_dir=args.rand_output_dir)
+
+    # optional single-image test
+    if args.image:
+        test_single_image(args.image, args.heatmap,
+                          args=args, output_dir=args.single_output_dir)
+
+    print("All tests completed successfully!")

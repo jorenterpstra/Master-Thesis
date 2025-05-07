@@ -246,6 +246,8 @@ class HeatmapGenerator:
         """Generate heatmap using BING objectness detection."""
         # Initialize BING saliency detector on demand
         bing_detector = cv2.saliency.ObjectnessBING_create()
+        if self.bing_training_path is None:
+            raise ValueError("BING training path is required for BING method")
         bing_detector.setTrainingPath(self.bing_training_path)
         
         # Load image in BGR via OpenCV (full size, no resizing)
@@ -261,7 +263,11 @@ class HeatmapGenerator:
         h, w = image_cv.shape[:2]
         heatmap_np = np.zeros((h, w), dtype=np.float32)
         for i in range(min(self.num_bboxes, saliencyMap.shape[0])):
-            x1, y1, x2, y2 = saliencyMap[i].astype(int)
+            # BING returns bounding boxes as [x, y, w, h]
+            bbox = saliencyMap[i].flatten().astype(int)
+            x, y, w, h = bbox
+            x1, y1 = x, y
+            x2, y2 = x + w, y + h
             x1, y1 = np.clip([x1, y1], 0, [w-1, h-1])
             x2, y2 = np.clip([x2, y2], [x1+1, y1+1], [w, h])
             weight = 1.0 - i / self.num_bboxes
@@ -287,8 +293,8 @@ class HeatmapGenerator:
         image = Image.open(original_image_path).convert('RGB')
         
         # Resize original image if needed
-        if image.size[0] != 224 or image.size[1] != 224:
-            image = transforms.Resize((224, 224))(image)
+        if image.size != heatmap.shape[1:][::-1]:
+            heatmap = F.interpolate(heatmap, size=image.size[::-1], mode='bilinear', align_corners=False)
         
         # Convert image to numpy array
         img_np = np.array(image)
@@ -357,8 +363,6 @@ def process_dataset(root_dir, output_dir, method='gradient', model_name='resnet1
     
     # Create output directory structure
     os.makedirs(output_dir, exist_ok=True)
-    heatmaps_dir = os.path.join(output_dir, 'heatmaps')
-    os.makedirs(heatmaps_dir, exist_ok=True)
     
     if visualize:
         vis_dir = os.path.join(output_dir, 'visualizations')
@@ -382,7 +386,7 @@ def process_dataset(root_dir, output_dir, method='gradient', model_name='resnet1
             image_files = image_files[:limit]
         
         # Create class output directory
-        class_heatmap_dir = os.path.join(heatmaps_dir, class_name)
+        class_heatmap_dir = os.path.join(output_dir, class_name)
         os.makedirs(class_heatmap_dir, exist_ok=True)
         
         if visualize:
@@ -402,7 +406,8 @@ def process_dataset(root_dir, output_dir, method='gradient', model_name='resnet1
                 if save_as_images:
                     # Save as PNG image
                     heatmap_np = (heatmap.squeeze().numpy() * 255).astype(np.uint8)
-                    heatmap_path = os.path.join(class_heatmap_dir, f"{base_filename}.png")
+                    heatmap_path = os.path.join(class_heatmap_dir, f"{base_filename}.JPEG")
+                    # Apply Gaussian blur to soften blocky artifacts
                     cv2.imwrite(heatmap_path, heatmap_np)
                 else:
                     # Save as tensor
