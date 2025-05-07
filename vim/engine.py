@@ -39,11 +39,11 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         criterion = torch.nn.BCEWithLogitsLoss()
 
     # Check if dataset includes custom rankings - directly use the flag from args
-    has_rankings = args.has_rankings.get('train', False)
+    rank_heat_out = args.rank_heat_out.get('train', False)
     
     for batch in metric_logger.log_every(data_loader, print_freq, header):
         # Unpack batch based on whether it includes rankings
-        if has_rankings:
+        if rank_heat_out:
             samples, targets, rankings = batch
         else:
             samples, targets = batch
@@ -182,8 +182,8 @@ def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, o
     # switch to evaluation mode
     model.eval()
     
-    # Use the has_rankings flag directly from args
-    has_rankings = args.has_rankings.get('val', False) if args is not None and hasattr(args, 'has_rankings') else False
+    # Use the rank_heat_out flag directly from args
+    rank_heat_out = args.rank_heat_out.get('val', False) if args is not None and hasattr(args, 'rank_heat_out') else False
     
     # Lists to store predictions and labels
     all_predictions = []
@@ -191,7 +191,7 @@ def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, o
 
     for batch in metric_logger.log_every(data_loader, 10, header):
         # Unpack batch based on whether it includes rankings
-        if has_rankings:
+        if rank_heat_out:
             images, target, rankings = batch
         else:
             images, target = batch
