@@ -11,13 +11,15 @@ from pathlib import Path
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms, models
+import cv2
 
 class HeatmapGenerator:
     """
     Class for generating heatmaps from images using various techniques.
     These heatmaps can be used to derive image-specific rankings later.
     """
-    def __init__(self, method='gradient', model_name='resnet18', device='cuda'):
+    def __init__(self, method='gradient', model_name='resnet18', device='cuda', 
+                 bing_training_path=None, num_bboxes=1000):
         """
         Initialize the heatmap generator.
         
@@ -27,11 +29,16 @@ class HeatmapGenerator:
                 - 'cam': Class Activation Mapping
                 - 'center_outward': Simple heatmap that diminishes from center to edges
                 - 'edge_detection': Uses edge detection to highlight important areas
+                - 'bing': Uses BING objectness detection to highlight important objects
             model_name (str): Name of the model to use (for gradient and cam methods)
             device (str): Device to use for computation
+            bing_training_path (str): Path to BING training data (required for 'bing' method)
+            num_bboxes (int): Number of bounding boxes to use for BING heatmap
         """
         self.method = method
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
+        self.bing_training_path = bing_training_path
+        self.num_bboxes = num_bboxes
         
         # Initialize model for gradient-based methods
         if method in ['gradient', 'cam']:
@@ -64,7 +71,13 @@ class HeatmapGenerator:
                 target_layer.register_forward_hook(forward_hook)
                 target_layer.register_full_backward_hook(backward_hook)
         
-        # Standard image preprocessing
+        # Initialize BING detector if needed
+        if method == 'bing':
+            if bing_training_path is None:
+                raise ValueError("BING training path is required for BING method")
+            # We'll initialize the detector on demand to avoid issues
+        
+        # Standard image preprocessing (not used for BING method)
         self.preprocess = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
@@ -90,6 +103,8 @@ class HeatmapGenerator:
             return self._generate_center_outward_heatmap(image_path)
         elif self.method == 'edge_detection':
             return self._generate_edge_heatmap(image_path)
+        elif self.method == 'bing':
+            return self._generate_bing_heatmap(image_path)
         else:
             raise ValueError(f"Unsupported method: {self.method}")
     
@@ -227,6 +242,38 @@ class HeatmapGenerator:
         
         return heatmap
     
+    def _generate_bing_heatmap(self, image_path):
+        """Generate heatmap using BING objectness detection."""
+        # Initialize BING saliency detector on demand
+        bing_detector = cv2.saliency.ObjectnessBING_create()
+        bing_detector.setTrainingPath(self.bing_training_path)
+        
+        # Load image in BGR via OpenCV (full size, no resizing)
+        image_cv = cv2.imread(image_path)
+        
+        # Compute saliency (returns list of bboxes)
+        success, saliencyMap = bing_detector.computeSaliency(image_cv)
+        if not success or saliencyMap is None:
+            h, w = image_cv.shape[:2]
+            return torch.zeros(1, h, w, dtype=torch.float32)
+        
+        # Build heatmap at original image size
+        h, w = image_cv.shape[:2]
+        heatmap_np = np.zeros((h, w), dtype=np.float32)
+        for i in range(min(self.num_bboxes, saliencyMap.shape[0])):
+            x1, y1, x2, y2 = saliencyMap[i].astype(int)
+            x1, y1 = np.clip([x1, y1], 0, [w-1, h-1])
+            x2, y2 = np.clip([x2, y2], [x1+1, y1+1], [w, h])
+            weight = 1.0 - i / self.num_bboxes
+            heatmap_np[y1:y2, x1:x2] += weight
+        
+        # Normalize to [0,1]
+        if heatmap_np.max() > 0:
+            heatmap_np /= heatmap_np.max()
+        
+        # Return as [1,H,W] tensor
+        return torch.from_numpy(heatmap_np).unsqueeze(0)
+    
     def visualize(self, heatmap, original_image_path, save_path=None):
         """
         Visualize the heatmap overlaid on the original image.
@@ -282,7 +329,8 @@ class HeatmapGenerator:
 
 
 def process_dataset(root_dir, output_dir, method='gradient', model_name='resnet18', 
-                    device='cuda', visualize=False, limit=None):
+                    device='cuda', visualize=False, limit=None, bing_training_path=None, 
+                    num_bboxes=1000, save_as_images=True):
     """
     Generate heatmaps for all images in a dataset directory structure.
     
@@ -294,9 +342,18 @@ def process_dataset(root_dir, output_dir, method='gradient', model_name='resnet1
         device (str): Device to use
         visualize (bool): Whether to save visualization images
         limit (int, optional): Limit the number of images to process per class
+        bing_training_path (str, optional): Path to BING training data (required for 'bing' method)
+        num_bboxes (int): Number of bounding boxes to use for BING heatmap
+        save_as_images (bool): Whether to save heatmaps as PNG images instead of tensors
     """
     # Initialize heatmap generator
-    generator = HeatmapGenerator(method, model_name, device)
+    generator = HeatmapGenerator(
+        method=method, 
+        model_name=model_name, 
+        device=device,
+        bing_training_path=bing_training_path,
+        num_bboxes=num_bboxes
+    )
     
     # Create output directory structure
     os.makedirs(output_dir, exist_ok=True)
@@ -340,16 +397,24 @@ def process_dataset(root_dir, output_dir, method='gradient', model_name='resnet1
                 # Generate heatmap
                 heatmap = generator.generate(img_path)
                 
-                # Save heatmap tensor
-                heatmap_path = os.path.join(class_heatmap_dir, f"{os.path.splitext(img_file)[0]}.pt")
-                torch.save(heatmap, heatmap_path)
+                # Save heatmap
+                base_filename = os.path.splitext(img_file)[0]
+                if save_as_images:
+                    # Save as PNG image
+                    heatmap_np = (heatmap.squeeze().numpy() * 255).astype(np.uint8)
+                    heatmap_path = os.path.join(class_heatmap_dir, f"{base_filename}.png")
+                    cv2.imwrite(heatmap_path, heatmap_np)
+                else:
+                    # Save as tensor
+                    heatmap_path = os.path.join(class_heatmap_dir, f"{base_filename}.pt")
+                    torch.save(heatmap, heatmap_path)
                 
                 # Store in dictionary
                 all_heatmaps[img_path] = heatmap
                 
                 # Visualize if requested
                 if visualize:
-                    vis_path = os.path.join(class_vis_dir, f"{os.path.splitext(img_file)[0]}_vis.png")
+                    vis_path = os.path.join(class_vis_dir, f"{base_filename}_vis.png")
                     generator.visualize(heatmap, img_path, save_path=vis_path)
             
             except Exception as e:
@@ -415,7 +480,7 @@ if __name__ == "__main__":
     parser.add_argument('--root', type=str, required=True, help='Root directory of the dataset')
     parser.add_argument('--output', type=str, required=True, help='Output directory')
     parser.add_argument('--method', type=str, default='gradient', 
-                        choices=['gradient', 'cam', 'center_outward', 'edge_detection'],
+                        choices=['gradient', 'cam', 'center_outward', 'edge_detection', 'bing'],
                         help='Method to generate heatmaps')
     parser.add_argument('--model', type=str, default='resnet18', 
                         choices=['resnet18', 'resnet50'],
@@ -424,6 +489,8 @@ if __name__ == "__main__":
     parser.add_argument('--visualize', action='store_true', help='Save visualizations')
     parser.add_argument('--limit', type=int, default=None, help='Limit images per class')
     parser.add_argument('--generate_rankings', action='store_true', help='Generate rankings from heatmaps')
+    parser.add_argument('--bing_training_path', type=str, default=None, help='Path to BING training data')
+    parser.add_argument('--num_bboxes', type=int, default=1000, help='Number of bounding boxes for BING method')
     args = parser.parse_args()
     
     # Generate heatmaps
@@ -434,7 +501,9 @@ if __name__ == "__main__":
         model_name=args.model,
         device=args.device,
         visualize=args.visualize,
-        limit=args.limit
+        limit=args.limit,
+        bing_training_path=args.bing_training_path,
+        num_bboxes=args.num_bboxes
     )
     
     # Convert to rankings if requested
