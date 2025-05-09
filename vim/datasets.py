@@ -265,34 +265,17 @@ class HeatmapImageFolder(ImageFolder):
     """Dataset that loads images and their corresponding heatmaps from parallel directories"""
     
     def __init__(self, root, heatmap_root, transform=None, target_transform=None,
-                 loader=default_loader, heatmap_extension='.png', return_path=False):
+                 loader=default_loader, heatmap_extension='.jpeg', return_path=False, 
+                 return_rankings=True, return_heatmap=False):
         super().__init__(root, transform=None, target_transform=target_transform, loader=loader)
         self.heatmap_root = heatmap_root
         self.heatmap_extension = heatmap_extension
         self.transform = transform
         self.return_path = return_path
         self.heatmap_loader = loader  # Use the same loader for both image and heatmap
+        self.return_rankings = return_rankings
+        self.return_heatmap = return_heatmap
         
-        # Verify heatmaps exist for some random samples
-        self._verify_heatmaps(10)
-    
-    def _verify_heatmaps(self, num_samples):
-        """Verify that heatmap files exist for some sample images"""
-        import random
-        indices = random.sample(range(len(self.samples)), min(num_samples, len(self.samples)))
-        missing = 0
-        
-        for idx in indices:
-            path, _ = self.samples[idx]
-            heatmap_path = self._get_heatmap_path(path)
-            if not os.path.exists(heatmap_path):
-                missing += 1
-                print(f"Warning: Missing heatmap for {path} at {heatmap_path}")
-        
-        if missing > 0:
-            print(f"Warning: {missing}/{num_samples} sample heatmaps not found.")
-        else:
-            print(f"Verified: {num_samples} sample heatmaps exist.")
     
     def _get_heatmap_path(self, image_path):
         """Convert image path to corresponding heatmap path"""
@@ -300,6 +283,78 @@ class HeatmapImageFolder(ImageFolder):
         base_path = os.path.splitext(rel_path)[0]
         heatmap_path = os.path.join(self.heatmap_root, base_path + self.heatmap_extension)
         return heatmap_path
+    
+
+    def _ranking_from_heatmap(self, heatmap):
+        """Convert a 2D or 3D heatmap into a flat ranking tensor of 196 patch-scores."""
+        # If RGB or multi-channel, collapse to single channel by averaging
+        current_heatmap = heatmap
+        if isinstance(current_heatmap, torch.Tensor):
+            # Permute CHW to HWC if it's a tensor, then convert to numpy
+            if current_heatmap.ndim == 3 and current_heatmap.shape[0] in [1, 3, 4]: # Basic check for CHW
+                current_heatmap = current_heatmap.permute(1, 2, 0)
+            current_heatmap = current_heatmap.cpu().numpy()
+
+        # Now current_heatmap is a numpy array
+        if current_heatmap.ndim == 3:
+            if current_heatmap.shape[2] == 1: # Handle (H, W, 1)
+                current_heatmap = current_heatmap.squeeze(axis=2)
+            else: # Assuming (H, W, C), average over channels
+                current_heatmap = current_heatmap.mean(axis=2)
+    
+        # Now current_heatmap should be a 2D (H, W) array
+        h, w = current_heatmap.shape
+        
+        # We expect a 224×224 heatmap and an output of 14×14 patches
+        patch_size = 16  # Standard ViT patch size
+        stride = 16      # Non-overlapping patches
+        
+        num_patches_h = (h - patch_size) // stride + 1
+        num_patches_w = (w - patch_size) // stride + 1
+        total_patches = num_patches_h * num_patches_w
+        
+        # Use integral image for efficient patch sum computation
+        integral_img = cv2.integral(current_heatmap.astype(np.float32))
+        
+        # Precompute coordinates
+        y_coords = np.arange(num_patches_h) * stride
+        x_coords = np.arange(num_patches_w) * stride
+        
+        # Compute patch scores using broadcasting for vectorization
+        y_start = y_coords.reshape(-1, 1)
+        x_start = x_coords.reshape(1, -1)
+        y_end = y_start + patch_size
+        x_end = x_start + patch_size
+        
+        # Using integral image formula: sum = tl + br - tr - bl
+        top_left = integral_img[y_start, x_start]
+        top_right = integral_img[y_start, x_end]
+        bottom_left = integral_img[y_end, x_start] 
+        bottom_right = integral_img[y_end, x_end]
+        
+        patch_scores = bottom_right - top_right - bottom_left + top_left
+        
+        # For flood-fill like tie-breaking, create a distance map from highest-scoring patch
+        flat_scores = patch_scores.flatten()
+        max_idx = np.argmax(flat_scores)
+        max_y, max_x = max_idx // num_patches_w, max_idx % num_patches_w
+        
+        # Create a distance map from the max score patch
+        y_grid, x_grid = np.mgrid[:num_patches_h, :num_patches_w]
+        distance_map = np.sqrt((y_grid - max_y)**2 + (x_grid - max_x)**2)
+        
+        # Scale the distance map to a very small value so it only affects ties
+        # This ensures that patches closer to the highest-scored one will be ranked higher
+        # when there are ties (similar to flood-fill behavior)
+        epsilon = np.finfo(np.float32).eps
+        max_score = np.max(patch_scores)
+        tie_breaking_scores = patch_scores - (distance_map * epsilon * max_score)
+        
+        # Get the ranking
+        flat_tie_breaking_scores = tie_breaking_scores.flatten()
+        ranking = np.argsort(-flat_tie_breaking_scores)
+        
+        return torch.from_numpy(ranking).long()
     
     def __getitem__(self, index):
         """Get image, heatmap, and target"""
@@ -322,20 +377,32 @@ class HeatmapImageFolder(ImageFolder):
             heatmap_np = np.array(heatmap)
         else:
             heatmap_np = heatmap
-            
+        
         # Apply transforms
         if self.transform is not None:
             transformed = self.transform(image=image_np, heatmap=heatmap_np)
             image = transformed['image']
             heatmap = transformed['heatmap']
+        else:
+            image = transforms.ToTensor()(image_np)
+            heatmap = transforms.ToTensor()(heatmap_np)
         
         if self.target_transform is not None:
             target = self.target_transform(target)
+
+        if self.return_rankings and not self.return_heatmap:
+            return image, target, self._ranking_from_heatmap(heatmap)
+        
+        elif self.return_heatmap and not self.return_rankings:
+            return image, target, heatmap
+        
+        elif self.return_rankings and self.return_heatmap:
+            return image, target, self._ranking_from_heatmap(heatmap), heatmap
         
         if self.return_path:
-            return image, heatmap, target, path
+            return image, target, path
         else:
-            return image, heatmap, target
+            return image, target
         
 
 
@@ -386,7 +453,9 @@ def build_dataset(is_train, args):
         heatmap_root = os.path.join(args.heatmap_path, 'train' if is_train else 'val')
         dataset = HeatmapImageFolder(
             root, heatmap_root, transform=transform,
-            return_path=getattr(args, 'return_path', False)
+            return_path=getattr(args, 'return_path', False),
+            return_rankings=getattr(args, 'return_rankings', False),
+            return_heatmap=getattr(args, 'return_heatmap', False)
         )
         nb_classes = 200
         rank_heat_out = True
@@ -432,3 +501,99 @@ def build_dataset(is_train, args):
 #     t.append(transforms.ToTensor())
 #     t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
 #     return transforms.Compose(t)
+
+def visualize_ranking(image, ranking, heatmap, num_patches_per_dim=14):
+    """Visualize the ranking of patches in an image"""
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Create a 2D grid to display the actual ranks at their spatial positions
+    ranks_display_grid = np.full((num_patches_per_dim, num_patches_per_dim), -1, dtype=float)
+    
+    # The input 'ranking' is a 1D tensor where ranking[i] is the flat index of the patch with rank i.
+    # We want to populate ranks_display_grid such that ranks_display_grid[patch_y, patch_x] = rank_of_that_patch.
+    ranking_np = ranking.numpy() # Ensure it's a NumPy array for easier handling
+    for rank_order, patch_flat_idx in enumerate(ranking_np):
+        patch_y = patch_flat_idx // num_patches_per_dim
+        patch_x = patch_flat_idx % num_patches_per_dim
+        if 0 <= patch_y < num_patches_per_dim and 0 <= patch_x < num_patches_per_dim:
+            ranks_display_grid[patch_y, patch_x] = rank_order
+
+
+
+    # Prepare heatmap for display
+    if hasattr(heatmap, 'numpy'):
+        heatmap_np = heatmap.numpy()
+    else:
+        heatmap_np = np.array(heatmap)
+    if heatmap_np.ndim == 3:  # collapse channels
+        heatmap_np = heatmap_np.mean(axis=2)
+    # heatmap_np = (heatmap_np - heatmap_np.min()) / (heatmap_np.max() - heatmap_np.min())
+
+    # Prepare image for display
+    if hasattr(image, 'permute'):  # torch Tensor HWC -> CHW
+        img_np = image.permute(1, 2, 0).numpy()
+    else:
+        img_np = np.array(image)
+    # normalize to [0,1]
+    img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
+    # Plot side by side
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    # Original image
+    axes[0].imshow(img_np)
+    axes[0].set_title("Original Image")
+    axes[0].axis('off')
+    # Heatmap
+    axes[1].imshow(heatmap_np, cmap='jet')
+    axes[1].set_title("Heatmap")
+    axes[1].axis('off')
+    # Patch ranking
+    im = axes[2].imshow(ranks_display_grid, cmap='hot', interpolation='nearest')
+    axes[2].set_title("Patch Rankings")
+    axes[2].axis('off')
+    fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
+    plt.tight_layout()
+    plt.show()
+
+def test_ranking():
+    import argparse
+    # Test the ranking functionality
+    cfg = {
+        "args": {
+            "data_set": "IMNET_HEATMAP",
+            "data_path": r"C:\Users\joren\Documents\_Uni\Master\Thesis\imagenet_subset",
+            "heatmap_path": r"C:\Users\joren\Documents\_Uni\Master\Thesis\imagenet_subset",
+            "input_size": 224,
+            "rankings_path": r"C:\Users\joren\Documents\_Uni\Master\Thesis\imagenet_subset",
+            "return_path": False,
+            "eval_crop_ratio": 1.0,
+            "return_rankings": True,
+            "return_heatmap": True,
+            "color_jitter": 0.0,
+            "aa": 'rand-m9-mstd0.5',
+            "reprob": 0.0,
+            "remode": 'pixel',
+            "recount": 1,
+            "train_interpolation": 'bicubic',
+        }
+    }
+    cfg_args = argparse.Namespace(**cfg["args"])
+    dataset = HeatmapImageFolder(
+        cfg_args.data_path + '/train',
+        cfg_args.heatmap_path + '/train_heat',
+        transform=build_transform(True, cfg_args),
+        return_path=cfg_args.return_path,
+        return_rankings=cfg_args.return_rankings,
+        return_heatmap=cfg_args.return_heatmap
+    )
+
+    idxs = np.random.choice(len(dataset), 5, replace=False)
+    for idx in idxs:
+        image, target, ranking, heatmap = dataset[idx]
+        print(f"Image shape: {image.shape}, Target: {target}, Ranking shape: {ranking.shape}")
+        visualize_ranking(image, ranking, heatmap)
+
+
+if __name__ == "__main__":
+    # Test the dataset loading and ranking functionality
+    test_ranking()
