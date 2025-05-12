@@ -6,6 +6,7 @@ import torch
 import random
 import cv2
 from functools import partial
+import math
 
 from PIL import Image, ImageEnhance, ImageOps, ImageFilter
 
@@ -43,7 +44,7 @@ def _enhance_increasing_level_to_arg(level, _hparams=None):
     # range [0.1, 1.9] if level <= _LEVEL_DENOM
     level = (level / _LEVEL_DENOM) * .9
     level = max(0.1, 1.0 + _randomly_negate(level))  # keep it >= 0.1
-    return level,
+    return level
 
 def _rotate_level_to_arg(level):
     # range [-30, 30]
@@ -55,7 +56,7 @@ def _shear_level_to_arg(level):
     # range [-0.3, 0.3]
     level = (level / _LEVEL_DENOM) * 0.3
     level = _randomly_negate(level)
-    return level
+    return math.degrees(math.atan(level))
 
 def _translate_rel_level_to_arg(level, translate_pct=0.45):
     # default range [-0.45, 0.45]
@@ -72,24 +73,103 @@ def _posterize_increasing_level_to_arg(level):
 def _solarize_increasing_level_to_arg(level):
     # range [256, 0]
     # intensity increases with level
-    level = 256 - int((level / _LEVEL_DENOM) * 256)
-    return level
+    level = (256 - int((level / _LEVEL_DENOM) * 256)) / 256.0
+    return level, level  # Normalize to [0, 1]
 
 def _solarize_add_level_to_arg(level):
     # range [0, 110]
     return min(128, int((level / _LEVEL_DENOM) * 110))
 
-def SolarizeAdd(img, add_value):
-    """Implement SolarizeAdd using numpy operations"""
-    img = np.clip(img + add_value, 0, 255).astype(np.uint8)
-    threshold = 128
-    return np.where(img < threshold, img, 255 - img)
+def apply_solarize_add(img, add, thresh=128, **kwargs):
+    mask = img > thresh
+    img = np.where(mask, img, img + add)
+    img = np.clip(img, 0, 255).astype(np.uint8)
+    return img
 
-def apply_solarize_add(img, add_value, **kwargs):
-    """Function version of SolarizeAdd for multiprocessing compatibility"""
-    img = np.clip(img + add_value, 0, 255).astype(np.uint8)
-    threshold = 128
-    return np.where(img < threshold, img, 255 - img)
+def apply_autocontrast(img, **kwargs):
+    # Handle floating point arrays
+    original_dtype = img.dtype
+    is_float = np.issubdtype(original_dtype, np.floating)
+    
+    if (is_float):
+        img = (img * 255).clip(0, 255).astype(np.uint8)
+        
+    pil_img = Image.fromarray(img)
+    pil_img = ImageOps.autocontrast(pil_img)
+    result = np.array(pil_img)
+    
+    if (is_float):
+        result = result.astype(np.float32) / 255.0
+        
+    return result
+
+def apply_color_enhance(img, factor, **kwargs):
+    original_dtype = img.dtype
+    is_float = np.issubdtype(original_dtype, np.floating)
+    
+    if (is_float):
+        img = (img * 255).clip(0, 255).astype(np.uint8)
+        
+    pil_img = Image.fromarray(img)
+    enhancer = ImageEnhance.Color(pil_img)
+    pil_img = enhancer.enhance(factor)
+    result = np.array(pil_img)
+    
+    if (is_float):
+        result = result.astype(np.float32) / 255.0
+        
+    return result
+
+def apply_contrast_enhance(img, factor, **kwargs):
+    original_dtype = img.dtype
+    is_float = np.issubdtype(original_dtype, np.floating)
+    
+    if (is_float):
+        img = (img * 255).clip(0, 255).astype(np.uint8)
+        
+    pil_img = Image.fromarray(img)
+    enhancer = ImageEnhance.Contrast(pil_img)
+    pil_img = enhancer.enhance(factor)
+    result = np.array(pil_img)
+    
+    if (is_float):
+        result = result.astype(np.float32) / 255.0
+        
+    return result
+
+def apply_brightness_enhance(img, factor, **kwargs):
+    original_dtype = img.dtype
+    is_float = np.issubdtype(original_dtype, np.floating)
+    
+    if (is_float):
+        img = (img * 255).clip(0, 255).astype(np.uint8)
+        
+    pil_img = Image.fromarray(img)
+    enhancer = ImageEnhance.Brightness(pil_img)
+    pil_img = enhancer.enhance(factor)
+    result = np.array(pil_img)
+    
+    if (is_float):
+        result = result.astype(np.float32) / 255.0
+        
+    return result
+
+def apply_sharpness_enhance(img, factor, **kwargs):
+    original_dtype = img.dtype
+    is_float = np.issubdtype(original_dtype, np.floating)
+    
+    if (is_float):
+        img = (img * 255).clip(0, 255).astype(np.uint8)
+        
+    pil_img = Image.fromarray(img)
+    enhancer = ImageEnhance.Sharpness(pil_img)
+    pil_img = enhancer.enhance(factor)
+    result = np.array(pil_img)
+    
+    if (is_float):
+        result = result.astype(np.float32) / 255.0
+        
+    return result
 
 class AlbumentationsRandAugment(BasicTransform):
     """Implementation of RandAugment using albumentations transforms"""
@@ -238,7 +318,7 @@ class AlbumentationsRandAugment(BasicTransform):
         
         # AutoContrast
         transforms['AutoContrast'] = {
-            'op': lambda level: A.CLAHE(clip_limit=4, p=1.0),
+            'op': lambda level: A.Lambda(image=apply_autocontrast, p=1.0),
             'spatial': False
         }
         
@@ -266,6 +346,7 @@ class AlbumentationsRandAugment(BasicTransform):
         # SolarizeIncreasing: fix threshold parameter
         transforms['SolarizeIncreasing'] = {
             'op': lambda level: A.Solarize(
+                threshold_range=(_solarize_increasing_level_to_arg(level)),
                 p=1.0
             ),
             'spatial': False
@@ -274,7 +355,7 @@ class AlbumentationsRandAugment(BasicTransform):
         # SolarizeAdd: use partial instead of lambda
         transforms['SolarizeAdd'] = {
             'op': lambda level: A.Lambda(
-                image=partial(apply_solarize_add, add_value=_solarize_add_level_to_arg(level)),
+                image=partial(apply_solarize_add, add=_solarize_add_level_to_arg(level)),
                 p=1.0
             ),
             'spatial': False
@@ -282,11 +363,8 @@ class AlbumentationsRandAugment(BasicTransform):
         
         # ColorIncreasing - Fix sat_shift_limit to be a proper range
         transforms['ColorIncreasing'] = {
-            'op': lambda level: A.HueSaturationValue(
-                hue_shift_limit=0,  # No hue change
-                # Create a proper range for saturation from 0 to magnitude-based value
-                sat_shift_limit=(-30 * level / _LEVEL_DENOM, 30 * level / _LEVEL_DENOM),
-                val_shift_limit=0,  # No value change
+            'op': lambda level: A.Lambda(
+                image=partial(apply_color_enhance, factor=_enhance_increasing_level_to_arg(level)),
                 p=1.0
             ),
             'spatial': False
@@ -294,10 +372,8 @@ class AlbumentationsRandAugment(BasicTransform):
         
         # ContrastIncreasing - Fix contrast_limit to be a proper range within [-1.0, 1.0]
         transforms['ContrastIncreasing'] = {
-            'op': lambda level: A.RandomBrightnessContrast(
-                brightness_limit=0,  # No brightness change
-                # Create a proper range for contrast from 0 to magnitude-based value
-                contrast_limit=(0, min(0.8, level / _LEVEL_DENOM * 0.8)),
+            'op': lambda level: A.Lambda(
+                image=partial(apply_contrast_enhance, factor=_enhance_increasing_level_to_arg(level)),
                 p=1.0
             ),
             'spatial': False
@@ -305,10 +381,8 @@ class AlbumentationsRandAugment(BasicTransform):
         
         # BrightnessIncreasing - Fix brightness_limit to be a proper range within [-1.0, 1.0]
         transforms['BrightnessIncreasing'] = {
-            'op': lambda level: A.RandomBrightnessContrast(
-                # Create a proper range for brightness from 0 to magnitude-based value
-                brightness_limit=(0, min(0.8, level / _LEVEL_DENOM * 0.8)),
-                contrast_limit=0,  # No contrast change
+            'op': lambda level: A.Lambda(
+                image=partial(apply_brightness_enhance, factor=_enhance_increasing_level_to_arg(level)),
                 p=1.0
             ),
             'spatial': False
@@ -316,10 +390,8 @@ class AlbumentationsRandAugment(BasicTransform):
         
         # SharpnessIncreasing - Fix lightness to ensure positive values
         transforms['SharpnessIncreasing'] = {
-            'op': lambda level: A.Sharpen(
-                alpha=(0.2, 0.5),
-                # Ensure lightness is in valid range (must be non-negative)
-                lightness=(0.1, min(1.0, 0.1 + level / _LEVEL_DENOM * 0.9)),
+            'op': lambda level: A.Lambda(
+                image=partial(apply_sharpness_enhance, factor=_enhance_increasing_level_to_arg(level)),
                 p=1.0
             ),
             'spatial': False
@@ -359,6 +431,7 @@ def build_transform(is_train, args):
                 A.RandomResizedCrop(
                     size=(args.input_size, args.input_size),
                     scale=(0.08, 1.0),
+                    ratio=(3. / 4., 4. / 3.),
                     interpolation=cv2.INTER_CUBIC
                 )
             )
@@ -424,9 +497,10 @@ def build_transform(is_train, args):
         # Random erasing (only applied to image tensor, not heatmap)
         if args.reprob > 0:
             transform_list.append(
-                A.CoarseDropout(num_holes_range=(1, 1),
-                    fill='random',
+                A.CoarseDropout(num_holes_range=(args.recount, args.recount),
+                    fill='random' if args.remode == 'pixel' else 'random_uniform',
                     p=args.reprob,
+                    fill_mask=0,
                     # CoarseDropout doesn't take mask_fill_value, so we fix that
                     # mask_fill_value is handled through additional_targets in Compose
                 )
