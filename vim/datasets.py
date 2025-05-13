@@ -264,7 +264,7 @@ class RankedImageFolder(ImageFolder):
 class HeatmapImageFolder(ImageFolder):
     """Dataset that loads images and their corresponding heatmaps from parallel directories"""
     
-    def __init__(self, root, heatmap_root, transform=None, target_transform=None,
+    def __init__(self, root, heatmap_root=None, transform=None, target_transform=None,
                  loader=default_loader, heatmap_extension='.JPEG', return_path=False, 
                  return_rankings=True, return_heatmap=False, global_heatmap_path=None):
         super().__init__(root, transform=None, target_transform=target_transform, loader=loader)
@@ -453,7 +453,7 @@ def build_dataset(is_train, args):
 
     elif args.data_set == 'IMNET_HEAT':
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
-        heatmap_root = os.path.join(args.heatmap_path, 'train' if is_train else 'val')
+        heatmap_root = None if args.heatmap_path is None else os.path.join(args.heatmap_path, 'train' if is_train else 'val')
         dataset = HeatmapImageFolder(
             root, heatmap_root, transform=transform,
             return_path=getattr(args, 'return_path', False),
