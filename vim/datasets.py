@@ -451,7 +451,7 @@ def build_dataset(is_train, args):
         nb_classes = 200
         rank_heat_out = True  # RankedImageFolder always returns rankings
 
-    elif args.data_set == 'IMNET_HEATMAP':
+    elif args.data_set == 'IMNET_HEAT':
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         heatmap_root = os.path.join(args.heatmap_path, 'train' if is_train else 'val')
         dataset = HeatmapImageFolder(
@@ -462,12 +462,6 @@ def build_dataset(is_train, args):
             global_heatmap_path=getattr(args, 'global_heatmap_path', None)
         )
         nb_classes = 200
-        rank_heat_out = True
-    
-    # Set ranking flag in args for easy access across the codebase
-    if not hasattr(args, 'rank_heat_out'):
-        args.rank_heat_out = {}
-    args.rank_heat_out['train' if is_train else 'val'] = rank_heat_out
 
     return dataset, nb_classes
 

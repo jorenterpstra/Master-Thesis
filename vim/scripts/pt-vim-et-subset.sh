@@ -30,7 +30,7 @@ python -m torch.distributed.run \
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
     main.py \
-    --data-set IMNET \
+    --data-set IMNET_HEAT \
     --model vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2 \
     --batch-size 128 \
     --drop-path 0.0 \
