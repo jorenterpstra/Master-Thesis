@@ -462,6 +462,7 @@ def build_dataset(is_train, args):
             global_heatmap_path=getattr(args, 'global_heatmap_path', None)
         )
         nb_classes = 200
+        print(root, heatmap_root)
 
     return dataset, nb_classes
 
