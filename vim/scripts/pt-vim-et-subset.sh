@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=vim-extra-tiny
 #SBATCH --time=10-00:00:00
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=3
 #SBATCH --cpus-per-task=4
 #SBATCH --gpu-freq=medium # Request medium priority GPU access
 
@@ -10,8 +10,8 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate mamba
 
-export OMP_NUM_THREADS=2
-export MKL_NUM_THREADS=2
+export OMP_NUM_THREADS=3
+export MKL_NUM_THREADS=3
 
 # export NCCL_DEBUG=INFO
 export NCCL_IB_DISABLE=1          # Disable InfiniBand if not available
@@ -26,7 +26,7 @@ export MASTER_PORT=29501
 
 # torchrun will set RANK, LOCAL_RANK, WORLD_SIZE, etc.
 python -m torch.distributed.run \
-    --nproc_per_node=2 \
+    --nproc_per_node=3 \
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
     main.py \
