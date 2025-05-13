@@ -374,6 +374,7 @@ class HeatmapImageFolder(ImageFolder):
         if self.return_rankings or self.return_heatmap:
             if self.global_heatmap is not None:
                 heatmap = self.global_heatmap
+                heatmap = heatmap.resize(image.size)
             else:
                 heatmap_path = self._get_heatmap_path(path)
                 heatmap = self.heatmap_loader(heatmap_path)
