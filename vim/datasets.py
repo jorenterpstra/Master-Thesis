@@ -266,7 +266,7 @@ class HeatmapImageFolder(ImageFolder):
     
     def __init__(self, root, heatmap_root, transform=None, target_transform=None,
                  loader=default_loader, heatmap_extension='.jpeg', return_path=False, 
-                 return_rankings=True, return_heatmap=False):
+                 return_rankings=True, return_heatmap=False, global_heatmap_path=None):
         super().__init__(root, transform=None, target_transform=target_transform, loader=loader)
         self.heatmap_root = heatmap_root
         self.heatmap_extension = heatmap_extension
@@ -275,7 +275,7 @@ class HeatmapImageFolder(ImageFolder):
         self.heatmap_loader = loader  # Use the same loader for both image and heatmap
         self.return_rankings = return_rankings
         self.return_heatmap = return_heatmap
-        
+        self.global_heatmap = loader(global_heatmap_path) if global_heatmap_path else None
     
     def _get_heatmap_path(self, image_path):
         """Convert image path to corresponding heatmap path"""
@@ -364,8 +364,11 @@ class HeatmapImageFolder(ImageFolder):
         image = self.loader(path)
         
         # Load heatmap as an image
-        heatmap_path = self._get_heatmap_path(path)
-        heatmap = self.heatmap_loader(heatmap_path)
+        if self.global_heatmap is not None:
+            heatmap = self.global_heatmap.clone()
+        else:
+            heatmap_path = self._get_heatmap_path(path)
+            heatmap = self.heatmap_loader(heatmap_path)
         
         # Convert both to numpy for albumentations if needed
         if not isinstance(image, np.ndarray):
@@ -455,7 +458,8 @@ def build_dataset(is_train, args):
             root, heatmap_root, transform=transform,
             return_path=getattr(args, 'return_path', False),
             return_rankings=getattr(args, 'return_rankings', False),
-            return_heatmap=getattr(args, 'return_heatmap', False)
+            return_heatmap=getattr(args, 'return_heatmap', False),
+            global_heatmap_path=getattr(args, 'global_heatmap_path', None)
         )
         nb_classes = 200
         rank_heat_out = True

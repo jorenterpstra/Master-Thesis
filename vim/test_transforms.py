@@ -450,18 +450,32 @@ def test_individual_transforms(image_path, heatmap_path=None, output_dir="indivi
         transform_info = base_augmenter.transforms[transform_name]
         is_spatial = transform_info['spatial']
         
-        # Create a 2x4 grid: top row for Albumentations, bottom row for timm
-        # First column is original image, next 3 are for different magnitudes
-        fig, axes = plt.subplots(2, 4, figsize=(16, 8))
+        # For spatial transforms, we'll show heatmaps too (4 rows instead of 2)
+        rows = 4 if is_spatial and heatmap is not None else 2
+        fig, axes = plt.subplots(rows, 4, figsize=(16, 4*rows))
         
         # Display original images (same for both rows)
         axes[0, 0].imshow(img)
         axes[0, 0].set_title("Original (Albumentation)")
         axes[0, 0].axis('off')
         
-        axes[1, 0].imshow(img)
-        axes[1, 0].set_title("Original (timm)")
-        axes[1, 0].axis('off')
+        # For spatial transforms, show heatmap on row 2
+        if is_spatial and heatmap is not None:
+            axes[1, 0].imshow(heatmap, cmap='viridis')
+            axes[1, 0].set_title("Original Heatmap (Album)")
+            axes[1, 0].axis('off')
+        
+        # Show timm original image
+        row_idx = 2 if is_spatial and heatmap is not None else 1
+        axes[row_idx, 0].imshow(img)
+        axes[row_idx, 0].set_title("Original (timm)")
+        axes[row_idx, 0].axis('off')
+        
+        # For spatial transforms with timm, show empty heatmap placeholder
+        if is_spatial and heatmap is not None:
+            axes[3, 0].imshow(heatmap, cmap='viridis')
+            axes[3, 0].set_title("Original Heatmap (timm)")
+            axes[3, 0].axis('off')
         
         # Apply transforms with different magnitude levels
         for i, magnitude in enumerate(magnitude_levels):
@@ -492,6 +506,14 @@ def test_individual_transforms(image_path, heatmap_path=None, output_dir="indivi
             axes[0, i+1].imshow(album_img)
             axes[0, i+1].set_title(f"Album {transform_name}\nMagnitude {magnitude}{album_params}")
             axes[0, i+1].axis('off')
+            
+            # Display albumentation transformed heatmap if spatial
+            if is_spatial and heatmap is not None:
+                album_heatmap = result.get('mask', None)
+                if album_heatmap is not None:
+                    axes[1, i+1].imshow(album_heatmap, cmap='viridis')
+                    axes[1, i+1].set_title(f"Album {transform_name} Heatmap\nMagnitude {magnitude}")
+                    axes[1, i+1].axis('off')
             
             # Apply timm transform
             timm_transform = timm_transforms[transform_name]
@@ -526,9 +548,18 @@ def test_individual_transforms(image_path, heatmap_path=None, output_dir="indivi
             timm_img = np.array(timm_transform(pil_img, magnitude))
             
             # Display timm transformed image
-            axes[1, i+1].imshow(timm_img)
-            axes[1, i+1].set_title(f"Timm {transform_name}\nMagnitude {magnitude}{timm_params}")
-            axes[1, i+1].axis('off')
+            row_idx = 2 if is_spatial and heatmap is not None else 1
+            axes[row_idx, i+1].imshow(timm_img)
+            axes[row_idx, i+1].set_title(f"Timm {transform_name}\nMagnitude {magnitude}{timm_params}")
+            axes[row_idx, i+1].axis('off')
+            
+            # For spatial transforms with timm, visualize what would happen to heatmap 
+            # We cannot directly apply timm transforms to heatmaps, but we can indicate this
+            if is_spatial and heatmap is not None:
+                axes[3, i+1].text(0.5, 0.5, "Timm cannot directly\ntransform heatmaps", 
+                                ha='center', va='center', transform=axes[3, i+1].transAxes)
+                axes[3, i+1].set_title(f"Timm {transform_name} Heatmap\nMagnitude {magnitude}")
+                axes[3, i+1].axis('off')
         
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f"{transform_name}_comparison.png"))
@@ -626,6 +657,7 @@ def test_dataloader_pipeline(images_root, heatmaps_root, output_dir="dataloader_
         plt.show()
         plt.close(fig)
 
+    return
     for batch_idx, (images, targets, rankings, heatmaps) in enumerate(valloader):
         if batch_idx >= num_batches:
             break

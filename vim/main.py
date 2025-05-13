@@ -165,6 +165,10 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,
                         help='dataset path')
+    parser.add_argument('--heatmap-path', default='', type=str,
+                        help='heatmap path')
+    parser.add_argument('--global-heatmap-path', default='', type=str,
+                        help='Path to global heatmap that will be used for all images')
     parser.add_argument('--data-set', default='IMNET_RANK', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19', 'IMNET_RANK'],
                         type=str, help='Image Net dataset path')
     parser.add_argument('--rankings-path', default='', type=str,

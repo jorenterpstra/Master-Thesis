@@ -185,6 +185,7 @@ class AlbumentationsRandAugment(BasicTransform):
         self._selected_ops = []
         # For storing intermediate results
         self._cached_result = {}
+        self._cached_transforms = {}
     
     @property
     def targets(self):
@@ -221,6 +222,7 @@ class AlbumentationsRandAugment(BasicTransform):
                         'transform': transform,
                         'level': level
                     }
+                    self._cached_transforms[op_name] = transform
                 
                 # Apply to image
                 result = transform(image=result)["image"]
@@ -233,6 +235,11 @@ class AlbumentationsRandAugment(BasicTransform):
             mask = np.array(mask)
             
         result = mask.copy()
+
+        for k, transform in self._cached_transforms.items():
+            if k in self._selected_ops:
+                # Apply the same transform as was applied to the image
+                result = transform(image=result)["mask"]
         
         for op_name in self._selected_ops:
             if op_name in self.transforms and self.transforms[op_name]['spatial']:
@@ -398,8 +405,30 @@ class AlbumentationsRandAugment(BasicTransform):
         }
         
         return transforms
-
+    
     def __call__(self, force_apply=False, **data):
+        if self.p < 1 and random.random() > self.p and not force_apply:
+            return data
+        
+        # Select random operations once
+        selected_ops = random.choices(list(_RAND_INCREASING_TRANSFORMS), k=self.num_ops)
+        
+        # Create a single-use composed transform with these operations
+        transforms_to_apply = []
+        for op_name in selected_ops:
+            if op_name in self.transforms:
+                level = self._sample_level()
+                transform_info = self.transforms[op_name]
+                transforms_to_apply.append(transform_info['op'](level))
+        
+        # Use Albumentations Compose to apply all transforms at once
+        # This ensures image and mask/heatmap get the same transforms
+        composed = A.Compose(transforms_to_apply, additional_targets={'heatmap': 'mask'})
+        
+        # Apply all transforms to both image and mask/heatmap in one go
+        return composed(**data)
+
+    def __call2__(self, force_apply=False, **data):
         if self.p < 1 and random.random() > self.p and not force_apply:
             return data
         
