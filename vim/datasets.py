@@ -366,7 +366,7 @@ class HeatmapImageFolder(ImageFolder):
         # Load heatmap as an image
         if self.global_heatmap is not None:
             heatmap = self.global_heatmap.clone()
-        elif self.heatmap_root is not None:
+        elif self.return_rankings:
             heatmap_path = self._get_heatmap_path(path)
             heatmap = self.heatmap_loader(heatmap_path)
         

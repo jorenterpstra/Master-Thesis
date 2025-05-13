@@ -165,7 +165,7 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,
                         help='dataset path')
-    parser.add_argument('--heatmap-path', default='', type=str,
+    parser.add_argument('--heatmap-path', default=None, type=str,
                         help='heatmap path')
     parser.add_argument('--global-heatmap-path', default=None, type=str,
                         help='Path to global heatmap that will be used for all images')
