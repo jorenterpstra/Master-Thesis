@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=generate-heatmap
+#SBATCH --output=generate-heatmap.out
 #SBATCH --time=1-00:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
