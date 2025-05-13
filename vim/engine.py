@@ -37,9 +37,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
     
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
-
-    # Check if dataset includes custom rankings - directly use the flag from args
-    rank_heat_out = args.rank_heat_out.get('train', False)
+    
     
     for batch in metric_logger.log_every(data_loader, print_freq, header):
         # Unpack batch based on whether it includes rankings
