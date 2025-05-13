@@ -265,7 +265,7 @@ class HeatmapImageFolder(ImageFolder):
     """Dataset that loads images and their corresponding heatmaps from parallel directories"""
     
     def __init__(self, root, heatmap_root, transform=None, target_transform=None,
-                 loader=default_loader, heatmap_extension='.jpeg', return_path=False, 
+                 loader=default_loader, heatmap_extension='.JPEG', return_path=False, 
                  return_rankings=True, return_heatmap=False, global_heatmap_path=None):
         super().__init__(root, transform=None, target_transform=target_transform, loader=loader)
         self.heatmap_root = heatmap_root
@@ -366,7 +366,7 @@ class HeatmapImageFolder(ImageFolder):
         # Load heatmap as an image
         if self.global_heatmap is not None:
             heatmap = self.global_heatmap.clone()
-        else:
+        elif self.heatmap_root is not None:
             heatmap_path = self._get_heatmap_path(path)
             heatmap = self.heatmap_loader(heatmap_path)
         
