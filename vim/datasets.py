@@ -320,7 +320,6 @@ class HeatmapImageFolder(ImageFolder):
         y_coords = np.arange(num_patches_h) * stride
         x_coords = np.arange(num_patches_w) * stride
         
-        # Compute patch scores using broadcasting for vectorization
         y_start = y_coords.reshape(-1, 1)
         x_start = x_coords.reshape(1, -1)
         y_end = y_start + patch_size
@@ -363,36 +362,48 @@ class HeatmapImageFolder(ImageFolder):
         # Load image
         image = self.loader(path)
         
-        # Load heatmap as an image
-        if self.global_heatmap is not None:
-            heatmap = self.global_heatmap.clone()
-        elif self.return_rankings:
-            heatmap_path = self._get_heatmap_path(path)
-            heatmap = self.heatmap_loader(heatmap_path)
-        
-        # Convert both to numpy for albumentations if needed
+        # Convert image to numpy for albumentations if needed
         if not isinstance(image, np.ndarray):
             image_np = np.array(image)
         else:
             image_np = image
+        
+        # Only load heatmap if we need it for rankings or direct output
+        heatmap = None
+        heatmap_np = None
+        if self.return_rankings or self.return_heatmap:
+            if self.global_heatmap is not None:
+                heatmap = self.global_heatmap
+            else:
+                heatmap_path = self._get_heatmap_path(path)
+                heatmap = self.heatmap_loader(heatmap_path)
             
-        if not isinstance(heatmap, np.ndarray):
-            heatmap_np = np.array(heatmap)
-        else:
-            heatmap_np = heatmap
+            # Convert heatmap to numpy for albumentations
+            if not isinstance(heatmap, np.ndarray):
+                heatmap_np = np.array(heatmap)
+            else:
+                heatmap_np = heatmap
         
         # Apply transforms
         if self.transform is not None:
-            transformed = self.transform(image=image_np, heatmap=heatmap_np)
-            image = transformed['image']
-            heatmap = transformed['heatmap']
+            if heatmap_np is not None:
+                # Apply transform to both image and heatmap
+                transformed = self.transform(image=image_np, heatmap=heatmap_np)
+                image = transformed['image']
+                heatmap = transformed['heatmap']
+            else:
+                # Apply transform to image only
+                transformed = self.transform(image=image_np)
+                image = transformed['image']
         else:
             image = transforms.ToTensor()(image_np)
-            heatmap = transforms.ToTensor()(heatmap_np)
+            if heatmap_np is not None:
+                heatmap = transforms.ToTensor()(heatmap_np)
         
         if self.target_transform is not None:
             target = self.target_transform(target)
-
+        
+        # Return appropriate outputs based on flags
         if self.return_rankings and not self.return_heatmap:
             return image, target, self._ranking_from_heatmap(heatmap)
         
@@ -402,7 +413,7 @@ class HeatmapImageFolder(ImageFolder):
         elif self.return_rankings and self.return_heatmap:
             return image, target, self._ranking_from_heatmap(heatmap), heatmap
         
-        if self.return_path:
+        elif self.return_path:
             return image, target, path
         else:
             return image, target
