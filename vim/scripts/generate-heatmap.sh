@@ -10,7 +10,7 @@ source ~/.bashrc
 conda activate mamba
 
 python generate_heatmaps.py \
-    --root /storage/scratch/6403840/data/imagenet-tiny/train \
-    --output /storage/scratch/6403840/data/imagenet-tiny/train_heat \
+    --root /storage/scratch/6403840/data/imagenet-tiny/val \
+    --output /storage/scratch/6403840/data/imagenet-tiny/val_heat \
     --method bing \
     --bing_training_path /storage/scratch/6403840/data/BING_models
