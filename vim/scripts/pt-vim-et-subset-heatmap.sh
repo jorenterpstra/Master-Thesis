@@ -37,7 +37,7 @@ python -m torch.distributed.run \
     --weight-decay 0.1 \
     --num_workers 16 \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
-    --heatmap_path /storage/scratch/6403840/data/imagenet-tiny \
+    --heatmap-path /storage/scratch/6403840/data/imagenet-tiny \
     --output_dir ./output/vim_extra_tiny_custom_transforms_heatmaps \
     --no_amp \
     --pin-mem \
