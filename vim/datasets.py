@@ -390,6 +390,19 @@ class HeatmapImageFolder(ImageFolder):
         if self.debug and image_np.shape != heatmap_np.shape if heatmap_np is not None else True:
             print(f"Image path: {path}, Heatmap path: {heatmap_path if heatmap_path else 'N/A'}")
             print(f"Image size: {image_np.shape}, Heatmap size: {heatmap_np.shape if heatmap_np is not None else 'N/A'}")
+
+        if heatmap_np is not None:
+            # Check if dimensions are transposed (same total pixels but h/w flipped)
+            if (heatmap_np.shape[0] == image_np.shape[1] and 
+                heatmap_np.shape[1] == image_np.shape[0] and
+                heatmap_np.shape[:2] != image_np.shape[:2]):
+                # Transpose the heatmap to match image dimensions
+                if self.debug:
+                    print(f"Transposing heatmap from {heatmap_np.shape} to match image {image_np.shape[:2]}")
+                if heatmap_np.ndim == 3:  # For RGB heatmaps
+                    heatmap_np = np.transpose(heatmap_np, (1, 0, 2))
+                else:  # For grayscale heatmaps
+                    heatmap_np = np.transpose(heatmap_np)
         
         # Apply transforms
         if self.transform is not None:
