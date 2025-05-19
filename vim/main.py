@@ -167,6 +167,8 @@ def get_args_parser():
                         help='dataset path')
     parser.add_argument('--heatmap-path', default=None, type=str,
                         help='heatmap path')
+    parser.add_argument('--return-rankings', action='store_true',
+                        help='return rankings for each image')
     parser.add_argument('--global-heatmap-path', default=None, type=str,
                         help='Path to global heatmap that will be used for all images')
     parser.add_argument('--data-set', default='IMNET_HEAT', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19', 'IMNET_HEAT'],
