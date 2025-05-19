@@ -387,7 +387,7 @@ class HeatmapImageFolder(ImageFolder):
             else:
                 heatmap_np = heatmap
 
-        if self.debug:
+        if self.debug and image_np.shape != heatmap_np.shape if heatmap_np is not None else True:
             print(f"Image path: {path}, Heatmap path: {heatmap_path if heatmap_path else 'N/A'}")
             print(f"Image size: {image_np.shape}, Heatmap size: {heatmap_np.shape if heatmap_np is not None else 'N/A'}")
         
@@ -447,28 +447,6 @@ def build_dataset(is_train, args):
         dataset = INatDataset(args.data_path, train=is_train, year=2019,
                               category=args.inat_category, transform=transform)
         nb_classes = dataset.nb_classes
-    elif args.data_set == 'IMNET_RANK':
-        root = os.path.join(args.data_path, 'train' if is_train else 'val')
-        rankings_dir = os.path.join(args.rankings_path, 'train' if is_train else 'val')
-        global_ranking = None
-        
-        # Load global ranking if specified
-        if hasattr(args, 'global_ranking_path') and args.global_ranking_path:
-            try:
-                global_ranking = torch.load(args.global_ranking_path)
-                print(f"Using global ranking from {args.global_ranking_path}")
-            except Exception as e:
-                print(f"Error loading global ranking from {args.global_ranking_path}: {e}")
-                print("Falling back to individual image rankings")
-                
-        dataset = RankedImageFolder(
-            root, rankings_dir, transform=transform, 
-            random_rankings=getattr(args, 'random_rankings', False),
-            global_ranking=global_ranking
-        )
-        nb_classes = 200
-        rank_heat_out = True  # RankedImageFolder always returns rankings
-
     elif args.data_set == 'IMNET_HEAT':
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         heatmap_root = None if args.heatmap_path is None else os.path.join(args.heatmap_path, 'train_heat' if is_train else 'val_heat')
