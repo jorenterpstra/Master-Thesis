@@ -10,7 +10,7 @@ def make_parser():
     parser.add_argument('--log_file', required=True, type=str, help='Path to log file')
     parser.add_argument('--save_path', type=str, default='./train_plots', help='Directory to save plots')
     parser.add_argument('--save_name', type=str, default='training_progress', help='Name of saved plot')
-    parser.add_argument('--n_last_epochs', type=int, default=20, help='Number of final epochs to plot')
+    parser.add_argument('--n_last_epochs', type=int, default=50, help='Number of final epochs to plot')
     return parser
 
 def plot_training_progress(train_loss, test_loss, train_acc1, test_acc1, train_acc5, test_acc5, train_lr, epoch, n_epoch, save_path, save_name):
