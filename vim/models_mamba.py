@@ -457,7 +457,7 @@ class VisionMamba(nn.Module):
             x_patches = torch.cat([x_before, x_after], dim=1)
 
             # 3) reorder via torch.gather using custom_rank [B, P]
-            idx = custom_rank.to(x.device).unsqueeze(-1).expand(-1, -1, C)
+            idx = custom_rank.unsqueeze(-1).expand(-1, -1, C)
             x_patches = torch.gather(x_patches, dim=1, index=idx)
 
             # 4) reassemble with CLS in middle → [B, P+1, C]

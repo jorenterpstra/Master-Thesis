@@ -37,7 +37,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
     
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
-    
+
     
     for batch in metric_logger.log_every(data_loader, print_freq, header):
         # Unpack batch based on whether it includes rankings
@@ -189,7 +189,7 @@ def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, o
 
     for batch in metric_logger.log_every(data_loader, 10, header):
         # Unpack batch based on whether it includes rankings
-        if rank_heat_out:
+        if getattr(args, 'return_rankings', False):
             images, target, rankings = batch
         else:
             images, target = batch
