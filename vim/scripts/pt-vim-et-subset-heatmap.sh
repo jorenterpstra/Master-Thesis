@@ -23,6 +23,7 @@ export NCCL_P2P_DISABLE=1
 
 export MASTER_ADDR=$(hostname)
 export MASTER_PORT=29501
+export CUDA_VISIBLE_DEVICES=2,3
 
 # torchrun will set RANK, LOCAL_RANK, WORLD_SIZE, etc.
 python -m torch.distributed.run \
