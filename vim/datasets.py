@@ -465,7 +465,7 @@ def build_dataset(is_train, args):
 
     elif args.data_set == 'IMNET_HEAT':
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
-        heatmap_root = None if args.heatmap_path is None else os.path.join(args.heatmap_path, 'train' if is_train else 'val')
+        heatmap_root = None if args.heatmap_path is None else os.path.join(args.heatmap_path, 'train_heat' if is_train else 'val_heat')
         dataset = HeatmapImageFolder(
             root, heatmap_root, transform=transform,
             return_path=getattr(args, 'return_path', False),

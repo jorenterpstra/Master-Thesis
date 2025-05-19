@@ -439,6 +439,10 @@ class VisionMamba(nn.Module):
             x = self.pos_drop(x)
 
         if custom_rank is not None:
+            if self.debug:
+                print("custom_rank is not None, using custom rank to reorder patches")
+                print("custom_rank shape: ", custom_rank.shape)
+                print("custom_rank: ", custom_rank)
             # x: [B, P+1, C], CLS token in middle
             B, T, C = x.shape         # T = P + 1
             P = T - 1
