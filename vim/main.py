@@ -538,7 +538,7 @@ def main(args):
              
 
         with timer("Validation"):
-            test_stats = evaluate(data_loader_val, model, device, amp_autocast)
+            test_stats = evaluate(data_loader_val, model, device, amp_autocast, args=args)
             print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         
         # Print comparison of training and validation metrics to monitor overfitting

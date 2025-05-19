@@ -178,11 +178,7 @@ def evaluate(data_loader, model, device, amp_autocast, save_predictions=False, o
     header = 'Test:'
 
     # switch to evaluation mode
-    model.eval()
-    
-    # Use the rank_heat_out flag directly from args
-    rank_heat_out = args.rank_heat_out.get('val', False) if args is not None and hasattr(args, 'rank_heat_out') else False
-    
+    model.eval()  
     # Lists to store predictions and labels
     all_predictions = []
     all_targets = []
