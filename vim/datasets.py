@@ -266,7 +266,8 @@ class HeatmapImageFolder(ImageFolder):
     
     def __init__(self, root, heatmap_root=None, transform=None, target_transform=None,
                  loader=default_loader, heatmap_extension='.JPEG', return_path=False, 
-                 return_rankings=True, return_heatmap=False, global_heatmap_path=None):
+                 return_rankings=True, return_heatmap=False, global_heatmap_path=None,
+                 debug=False):
         super().__init__(root, transform=None, target_transform=target_transform, loader=loader)
         self.heatmap_root = heatmap_root
         self.heatmap_extension = heatmap_extension
@@ -276,6 +277,7 @@ class HeatmapImageFolder(ImageFolder):
         self.return_rankings = return_rankings
         self.return_heatmap = return_heatmap
         self.global_heatmap = loader(global_heatmap_path) if global_heatmap_path else None
+        self.debug = debug
     
     def _get_heatmap_path(self, image_path):
         """Convert image path to corresponding heatmap path"""
@@ -384,6 +386,10 @@ class HeatmapImageFolder(ImageFolder):
                 heatmap_np = np.array(heatmap)
             else:
                 heatmap_np = heatmap
+
+        if self.debug:
+            print(f"Image path: {path}, Heatmap path: {heatmap_path if heatmap_path else 'N/A'}")
+            print(f"Image size: {image_np.shape}, Heatmap size: {heatmap_np.shape if heatmap_np is not None else 'N/A'}")
         
         # Apply transforms
         if self.transform is not None:
