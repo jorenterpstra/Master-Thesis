@@ -387,7 +387,7 @@ class HeatmapImageFolder(ImageFolder):
             else:
                 heatmap_np = heatmap
 
-        if self.debug and image_np.shape != heatmap_np.shape if heatmap_np is not None else True:
+        if self.debug and (image_np.shape != heatmap_np.shape if heatmap_np is not None else True):
             print(f"[DEBUG] Image path: {path}, Heatmap path: {heatmap_path if heatmap_path else 'N/A'}")
             print(f"[DEBUG] Image size: {image_np.shape}, Heatmap size: {heatmap_np.shape if heatmap_np is not None else 'N/A'}")
 
