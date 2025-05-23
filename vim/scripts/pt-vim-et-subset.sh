@@ -37,7 +37,7 @@ python -m torch.distributed.run \
     --weight-decay 0.1 \
     --num_workers 16 \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
-    --output_dir ./output/vim_extra_tiny_custom_transforms_baseline \
+    --output_dir ./output/vim_extra_tiny_custom_transforms_baseline2 \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
