@@ -468,7 +468,7 @@ def build_dataset(is_train, args):
             return_path=getattr(args, 'return_path', False),
             return_rankings=getattr(args, 'return_rankings', False),
             return_heatmap=getattr(args, 'return_heatmap', False),
-            global_heatmap_path=getattr(args, 'global_heatmap_path', None),
+            global_heatmap_path=getattr(args, 'global-heatmap-path', None),
             debug=getattr(args, 'debug', False)
         )
         nb_classes = 200
