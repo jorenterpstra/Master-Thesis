@@ -40,7 +40,7 @@ python -m torch.distributed.run \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
     --global-heatmap-path /storage/scratch/6403840/data/imagenet-tiny/pil_bbox_heatmap.png \
     --return-rankings \
-    --output_dir ./output/vim_extra_tiny_custom_transforms_heatmaps \
+    --output_dir ./output/vim_extra_tiny_custom_transforms_global \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
