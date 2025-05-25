@@ -277,6 +277,7 @@ class HeatmapImageFolder(ImageFolder):
         self.return_rankings = return_rankings
         self.return_heatmap = return_heatmap
         self.global_heatmap = loader(global_heatmap_path) if global_heatmap_path else None
+        print(f"Global heatmap loaded: {self.global_heatmap is not None} from {global_heatmap_path if global_heatmap_path else 'N/A'}")
         self.debug = debug
     
     def _get_heatmap_path(self, image_path):
