@@ -359,9 +359,15 @@ def visualize_bbox_heatmap(heatmap, all_bboxes, output_dir, resolution=(224, 224
     
     plt.savefig(os.path.join(output_dir, 'patch_rank_heatmap.png'), dpi=300, bbox_inches='tight')
     plt.close()
-    
-    # Save the patch heatmap as a numpy array for later use
+      # Save the patch heatmap as a numpy array for later use
     np.save(os.path.join(output_dir, 'patch_interest_heatmap.npy'), patch_heatmap)
+    
+    # Save the original heatmap as a numpy array
+    np.save(os.path.join(output_dir, 'bbox_heatmap.npy'), heatmap)
+    
+    # Save both heatmaps as image files for use in models
+    hm_path, pil_path = save_heatmap_as_image(heatmap, output_dir, 'bbox_heatmap.png')
+    patch_hm_path, patch_pil_path = save_heatmap_as_image(patch_heatmap, output_dir, 'patch_interest_heatmap.png')
     
     # Save the patch rankings as numpy arrays for later use
     patch_ranks = np.zeros((grid_size_h, grid_size_w), dtype=np.int32)
@@ -402,15 +408,98 @@ def visualize_bbox_heatmap(heatmap, all_bboxes, output_dir, resolution=(224, 224
     print(f"Visualizations saved to {output_dir}")
     print(f"Top patches saved to {patches_dir}")
 
+def save_heatmap_as_image(heatmap, output_dir, filename='bbox_heatmap.png'):
+    """
+    Save a NumPy heatmap as an image file that can be used by models.
+    
+    Args:
+        heatmap (numpy.ndarray): The heatmap as a numpy array
+        output_dir (str): Directory to save the image
+        filename (str): Filename for the saved image
+    
+    Returns:
+        str: Path to the saved image
+    """
+    # Ensure heatmap is normalized to 0-1
+    if np.max(heatmap) > 0:
+        normalized_heatmap = heatmap / np.max(heatmap)
+    else:
+        normalized_heatmap = heatmap
+    
+    # Convert to 0-255 range for image
+    heatmap_image = (normalized_heatmap * 255).astype(np.uint8)
+    
+    # Create the full path
+    image_path = os.path.join(output_dir, filename)
+    
+    # Using matplotlib to save as image
+    plt.figure(figsize=(8, 8))
+    plt.imshow(heatmap_image, cmap='hot', interpolation='nearest')
+    plt.axis('off')  # Remove axes for clean image
+    plt.tight_layout(pad=0)
+    plt.savefig(image_path, bbox_inches='tight', pad_inches=0, dpi=100)
+    plt.close()
+    
+    # Using PIL for a more direct conversion
+    from PIL import Image
+    pil_img = Image.fromarray(heatmap_image)
+    pil_path = os.path.join(output_dir, f"pil_{filename}")
+    pil_img.save(pil_path)
+    
+    print(f"Saved heatmap image to {image_path} and {pil_path}")
+    
+    return image_path, pil_path
+
+def convert_numpy_heatmap_to_image(numpy_path, output_dir):
+    """
+    Convert an existing NumPy heatmap file to image format for use in models.
+    
+    Args:
+        numpy_path (str): Path to the NumPy .npy file containing the heatmap
+        output_dir (str): Directory to save the output image
+    
+    Returns:
+        str: Path to the saved image file
+    """
+    # Load the heatmap from file
+    heatmap = np.load(numpy_path)
+    
+    # Get the base filename without extension
+    base_filename = os.path.splitext(os.path.basename(numpy_path))[0]
+    
+    # Save as image
+    image_path, pil_path = save_heatmap_as_image(heatmap, output_dir, f"{base_filename}.png")
+    
+    return image_path, pil_path
+
 def main():
     parser = argparse.ArgumentParser(description='Generate and visualize a heatmap of bounding boxes in Tiny ImageNet')
-    parser.add_argument('--dataset', type=str, required=True, help='Path to Tiny ImageNet dataset')
+    parser.add_argument('--dataset', type=str, help='Path to Tiny ImageNet dataset')
     parser.add_argument('--output', type=str, default='bbox_heatmaps', help='Output directory for visualizations')
     parser.add_argument('--resolution', type=int, default=224, help='Resolution for heatmap generation')
     parser.add_argument('--boxes', type=int, default=100, help='Number of random boxes to show in visualization')
     parser.add_argument('--patch-size', type=int, default=16, help='Size of each patch (standard ViT uses 16×16)')
+    parser.add_argument('--convert-npy', type=str, help='Path to existing .npy heatmap file to convert to image (skips generation)')
     
     args = parser.parse_args()
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(args.output, exist_ok=True)
+    
+    # If --convert-npy is specified, just convert the existing NumPy heatmap to image
+    if args.convert_npy:
+        if not os.path.exists(args.convert_npy):
+            print(f"Error: NumPy file {args.convert_npy} not found")
+            return
+        
+        print(f"Converting NumPy heatmap {args.convert_npy} to image format")
+        image_path, pil_path = convert_numpy_heatmap_to_image(args.convert_npy, args.output)
+        print(f"Conversion complete. Saved images to {image_path} and {pil_path}")
+        return
+    
+    # Otherwise, generate the heatmap from the dataset
+    if not args.dataset:
+        parser.error("--dataset is required when not using --convert-npy")
     
     resolution = (args.resolution, args.resolution)
     
@@ -425,6 +514,7 @@ def main():
     print(f"Average image size: {np.mean([w for w, h in image_sizes]):.1f}x{np.mean([h for w, h in image_sizes]):.1f}")
     
     visualize_bbox_heatmap(heatmap, all_bboxes, args.output, resolution, args.boxes, args.patch_size)
+    save_heatmap_as_image(heatmap, args.output, 'final_heatmap_image.png')
 
 if __name__ == "__main__":
     main()
