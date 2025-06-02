@@ -27,3 +27,4 @@ transforms/
 dataset_test_results/
 .vscode/launch.json
 output2.txt
+synsets.txt
