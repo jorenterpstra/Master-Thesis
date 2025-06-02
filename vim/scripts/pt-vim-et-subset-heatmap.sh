@@ -40,7 +40,7 @@ python -m torch.distributed.run \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
     --heatmap-path /storage/scratch/6403840/data/imagenet-tiny \
     --return-rankings \
-    --output_dir ./output/vim_extra_tiny_custom_transforms_heatmap \
+    --output_dir ./output/vim_extra_tiny_custom_transforms_heatmap_pos_embed \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \

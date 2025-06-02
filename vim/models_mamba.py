@@ -428,15 +428,6 @@ class VisionMamba(nn.Module):
                     x = torch.cat((cls_token, x), dim=1)
                 M = x.shape[1]
 
-        if self.if_abs_pos_embed:
-            # if new_grid_size[0] == self.patch_embed.grid_size[0] and new_grid_size[1] == self.patch_embed.grid_size[1]:
-            #     x = x + self.pos_embed
-            # else:
-            #     pos_embed = interpolate_pos_embed_online(
-            #                 self.pos_embed, self.patch_embed.grid_size, new_grid_size,0
-            #             )
-            x = x + self.pos_embed # position embedding is added here
-            x = self.pos_drop(x)
 
         if custom_rank is not None:
             if self.debug:
@@ -466,6 +457,17 @@ class VisionMamba(nn.Module):
                 x_cls,
                 x_patches[:, cls_pos:, :]
             ], dim=1)
+
+        if self.if_abs_pos_embed:
+            # if new_grid_size[0] == self.patch_embed.grid_size[0] and new_grid_size[1] == self.patch_embed.grid_size[1]:
+            #     x = x + self.pos_embed
+            # else:
+            #     pos_embed = interpolate_pos_embed_online(
+            #                 self.pos_embed, self.patch_embed.grid_size, new_grid_size,0
+            #             )
+            x = x + self.pos_embed # position embedding is added here
+            x = self.pos_drop(x)
+
 
         if if_random_token_rank:
 
