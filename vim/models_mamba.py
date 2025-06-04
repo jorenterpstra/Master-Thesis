@@ -474,11 +474,12 @@ class VisionMamba(nn.Module):
             # 生成随机 shuffle 索引
             shuffle_indices = torch.randperm(M)
 
-            if isinstance(token_position, list):
-                print("original value: ", x[0, token_position[0], 0], x[0, token_position[1], 0])
-            else:
-                print("original value: ", x[0, token_position, 0])
-            print("original token_position: ", token_position)
+            if self.debug:
+                if isinstance(token_position, list):
+                    print("original value: ", x[0, token_position[0], 0], x[0, token_position[1], 0])
+                else:
+                    print("original value: ", x[0, token_position, 0])
+                print("original token_position: ", token_position)
 
             # 执行 shuffle
             x = x[:, shuffle_indices, :]
@@ -491,11 +492,12 @@ class VisionMamba(nn.Module):
                 # 找到 cls token 在 shuffle 之后的新位置
                 token_position = torch.where(shuffle_indices == token_position)[0].item()
 
-            if isinstance(token_position, list):
-                print("new value: ", x[0, token_position[0], 0], x[0, token_position[1], 0])
-            else:
-                print("new value: ", x[0, token_position, 0])
-            print("new token_position: ", token_position)
+            if self.debug:
+                if isinstance(token_position, list):
+                    print("new value: ", x[0, token_position[0], 0], x[0, token_position[1], 0])
+                else:
+                    print("new value: ", x[0, token_position, 0])
+                print("new token_position: ", token_position)
 
 
 
