@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 import torch
 import xml.etree.ElementTree as ET
 from utils import add_grid, create_patch_score_map
+import os
 
 def get_original_bboxes(xml_path):
     """Helper function to get unscaled bounding boxes"""
@@ -32,12 +33,22 @@ def get_original_bboxes(xml_path):
     
     return valid_boxes
 
-def visualize_sample(root_dir, split='train', idx=0):
+def visualize_sample(root_dir, split='train', idx=0, export_path=None):
     """
     Visualize a single sample with:
     1. Original image with original (unscaled) bounding boxes
     2. Transformed image (model input) with transformed bounding boxes
     3. Transformed image with patch score heatmap overlay
+    
+    Args:
+        root_dir: Path to dataset root directory
+        split: 'train' or 'val'
+        idx: Index of sample to visualize
+        export_path: Directory to export visualization images (None to skip export)
+    
+    Returns:
+        If export_path is provided, returns tuple of (bbox_img_path, heatmap_img_path)
+        Otherwise returns None
     """
     # Create datasets - one with transforms, one without
     transform = transforms.Compose([
@@ -110,6 +121,50 @@ def visualize_sample(root_dir, split='train', idx=0):
     plt.colorbar(heatmap, ax=ax3)
     
     plt.tight_layout()
+    
+    # Export images for thesis report if path is provided
+    bbox_img_path = None
+    heatmap_img_path = None
+    if export_path:
+        # Create export directory if it doesn't exist
+        os.makedirs(export_path, exist_ok=True)
+        
+        # Get sample identifier from the image path
+        img_name = os.path.splitext(os.path.basename(dataset_raw.image_paths[idx]))[0]
+        
+        # Export the transformed image with bounding boxes (high resolution)
+        bbox_img_path = os.path.join(export_path, f"{img_name}_bbox.png")
+        bbox_fig = plt.figure(figsize=(8, 8), dpi=300)
+        bbox_ax = bbox_fig.add_subplot(111)
+        bbox_ax.imshow(transformed_img_pil)
+        if transformed_boxes:
+            # Draw bounding boxes on a separate figure for clean export
+            draw_img = transformed_img_pil.copy()
+            draw = ImageDraw.Draw(draw_img)
+            for bbox in transformed_boxes:
+                x, y, w, h = map(int, bbox)
+                if w > 0 and h > 0:  # Only draw valid boxes
+                    draw.rectangle([x, y, x+w, y+h], outline='blue', width=2)
+            bbox_ax.imshow(draw_img)
+        bbox_ax.axis('off')
+        bbox_fig.tight_layout(pad=0)
+        bbox_fig.savefig(bbox_img_path, bbox_inches='tight', pad_inches=0)
+        plt.close(bbox_fig)
+        
+        # Export the heatmap visualization (high resolution)
+        heatmap_img_path = os.path.join(export_path, f"{img_name}_heatmap.png")
+        heat_fig = plt.figure(figsize=(8, 8), dpi=300)
+        heat_ax = heat_fig.add_subplot(111)
+        heat_ax.imshow(transformed_img_pil)
+        heat = heat_ax.imshow(score_map, cmap='hot', alpha=0.5)
+        heat_ax.axis('off')
+        heat_fig.colorbar(heat)
+        heat_fig.tight_layout(pad=0)
+        heat_fig.savefig(heatmap_img_path, bbox_inches='tight', pad_inches=0)
+        plt.close(heat_fig)
+        
+        print(f"Exported images to:\n{bbox_img_path}\n{heatmap_img_path}")
+    
     plt.show()
 
     # Print statistics
@@ -120,10 +175,14 @@ def visualize_sample(root_dir, split='train', idx=0):
     print(f"Max score: {scores.max():.3f}")
     print(f"Mean score: {scores.mean():.3f}")
     print(f"Number of patches with score > 0.5: {(scores > 0.5).sum()}")
+    
+    return (bbox_img_path, heatmap_img_path) if export_path else None
 
 if __name__ == "__main__":
     root_dir = Path("C:/Users/joren/Documents/_Uni/Master/Thesis/imagenet_subset")
+    # Create an export directory for thesis figures
+    export_path = Path("C:/Users/joren/Documents/_Uni/Master/Thesis/Master-Thesis/thesis_figures")
     
-    for i in range(0, 230, 40):
-        visualize_sample(root_dir, split='train', idx=i)
+    for i in range(0, 230, 30):
+        visualize_sample(root_dir, split='train', idx=i, export_path=export_path)
 

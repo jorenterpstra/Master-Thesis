@@ -26,7 +26,7 @@ export MASTER_PORT=29501
 # export CUDA_VISIBLE_DEVICES=2,3
 
 # Minimum required memory in MB
-REQUIRED_MEM=10240
+REQUIRED_MEM=12480
 NUM_GPUS=2
 
 echo "Looking for $NUM_GPUS GPUs with at least $REQUIRED_MEM MB free..."
