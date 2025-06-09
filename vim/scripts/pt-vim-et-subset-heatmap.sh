@@ -5,6 +5,28 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gpu-freq=high # Request medium priority GPU access
 
+#––– error‐trap boilerplate –––
+set -o errexit       # exit on any error
+set -o errtrace      # ensure ERR trap is inherited by functions, subshells
+
+dump_gpus_and_procs() {
+  echo
+  echo "=================== GPU STATUS AT FAILURE ==================="
+  date
+  echo "--- nvidia-smi summary ---"
+  nvidia-smi
+  echo
+  echo "--- compute-apps (pid, user, gpu_mem) ---"
+  nvidia-smi --query-compute-apps=pid,username,used_memory --format=csv,noheader,nounits
+  echo
+  echo "--- all python / cuda processes ---"
+  ps -eo pid,user,etime,cmd | grep -E 'python|cuda' || true
+  echo "============================================================="
+}
+
+trap 'echo "!!! ERROR detected, dumping GPU & process info !!!"; dump_gpus_and_procs' ERR
+#––––––––––––––––––––––––––––––––––
+
 # Load modules
 module load cuda/11.8
 source ~/.bashrc
