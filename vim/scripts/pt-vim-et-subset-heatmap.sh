@@ -3,7 +3,7 @@
 #SBATCH --time=10-00:00:00
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=4
-#SBATCH --gpu-freq=high # Request medium priority GPU access
+#SBATCH --gpu-freq=high # Request high priority GPU access
 
 #––– error‐trap boilerplate –––
 set -o errexit       # exit on any error
@@ -13,9 +13,6 @@ dump_gpus_and_procs() {
   echo
   echo "=================== GPU STATUS AT FAILURE ==================="
   date
-  echo "--- nvidia-smi summary ---"
-  nvidia-smi
-  echo
   echo "--- compute-apps (pid, user, gpu_mem) ---"
   nvidia-smi && nvidia-smi | tr -s ' ' | grep -Eo "| [0-9]+ N/A N/A [0-9]{3,} .*" | awk -F' ' '{pid=$4; cmd="ps -p " pid " -o etime="; cmd | getline etime; close(cmd); cmd="ps -p " pid " -o uname="; cmd | getline user; close(cmd); cmd="tr \"\\0\" \" \" < /proc/" pid "/cmdline"; cmd | getline cmdline; close(cmd); printf("%s\t%s\t%s\t%s\t%s\t%s\n", $1, pid, user, etime, $7, cmdline); }'
   echo "============================================================="
@@ -46,7 +43,7 @@ export MASTER_PORT=29501
 # export CUDA_VISIBLE_DEVICES=2,3
 
 # Minimum required memory in MB
-REQUIRED_MEM=12480
+REQUIRED_MEM=10800
 NUM_GPUS=2
 
 echo "Looking for $NUM_GPUS GPUs with at least $REQUIRED_MEM MB free..."
