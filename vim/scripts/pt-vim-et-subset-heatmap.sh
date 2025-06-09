@@ -17,7 +17,7 @@ dump_gpus_and_procs() {
   nvidia-smi
   echo
   echo "--- compute-apps (pid, user, gpu_mem) ---"
-  nvidia-smi --query-compute-apps=pid,username,used_memory --format=csv,noheader,nounits
+  nvidia-smi && (nvidia-smi |tr -s ' '|grep -Eo "| [0123456789]+ N/A N/A [0-9]{3,} .*"|awk -F' ' '{system("s=$(cat /proc/"$4"/cmdline| tr \"\\0\" \" \");u=$(ps -o uname= -p "$4");echo "$1"sep"$4"sep$u sep"$7"sep$s" ) }'|sed 's/sep/\t/g')
   echo
   echo "--- all python / cuda processes ---"
   ps -eo pid,user,etime,cmd | grep -E 'python|cuda' || true
