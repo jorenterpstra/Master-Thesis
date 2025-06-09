@@ -24,7 +24,8 @@ dump_gpus_and_procs() {
   echo "============================================================="
 }
 
-trap 'echo "!!! ERROR detected, dumping GPU & process info !!!"; dump_gpus_and_procs' ERR
+trap 'echo "!!! Job terminating, dumping GPU & process info !!!"; dump_gpus_and_procs' \
+     ERR TERM INT EXIT
 #––––––––––––––––––––––––––––––––––
 
 # Load modules
