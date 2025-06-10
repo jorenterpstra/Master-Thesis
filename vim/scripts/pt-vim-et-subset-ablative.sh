@@ -88,8 +88,8 @@ python -m torch.distributed.run \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
     --heatmap-path /storage/scratch/6403840/data/imagenet-tiny \
     --return-rankings \
-    --output_dir ./output/vim_extra_tiny_custom_transforms_half_patch \
-    --reduction half \
+    --output_dir ./output/vim_extra_tiny_custom_transforms_quarter_patch \
+    --reduction quarter \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
