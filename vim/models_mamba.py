@@ -274,6 +274,7 @@ class VisionMamba(nn.Module):
                  use_double_cls_token=False,
                  use_middle_cls_token=True,
                  debug=False,
+                 reduction='full',
                  **kwargs):
         factory_kwargs = {"device": device, "dtype": dtype}
         # add factory_kwargs into kwargs
@@ -291,7 +292,9 @@ class VisionMamba(nn.Module):
         self.use_double_cls_token = use_double_cls_token
         self.use_middle_cls_token = use_middle_cls_token
         self.num_tokens = 1 if if_cls_token else 0
+        self.seq_reduction = reduction
         self.debug = debug
+        print("--reduction: ", self.seq_reduction)
 
         # pretrain parameters
         self.num_classes = num_classes
@@ -399,7 +402,8 @@ class VisionMamba(nn.Module):
     def load_pretrained(self, checkpoint_path, prefix=""):
         _load_weights(self, checkpoint_path, prefix)
 
-    def forward_features(self, x, inference_params=None, if_random_cls_token_position=False, if_random_token_rank=False, custom_rank=None):
+    def forward_features(self, x, inference_params=None, if_random_cls_token_position=False, 
+                         if_random_token_rank=False, custom_rank=None):
         # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
         # with slight modifications to add the dist_token
         x = self.patch_embed(x)
@@ -459,6 +463,21 @@ class VisionMamba(nn.Module):
             # 3) reorder via torch.gather using custom_rank [B, P]
             idx = custom_rank.unsqueeze(-1).expand(-1, -1, C)
             x_patches = torch.gather(x_patches, dim=1, index=idx)
+
+            # NEW: 3) Prune the sequence after reshuffling
+            if self.seq_reduction != 'full':
+                # Calculate how many patches to keep
+                if self.seq_reduction == 'half':
+                    keep_patches = P // 2
+                elif self.seq_reduction == 'quarter':
+                    keep_patches = P // 4
+                else:
+                    keep_patches = P  # Default to full
+                    
+                x_patches = x_patches[:, :keep_patches, :]  # Keep only the first `keep_patches` patches
+                
+                # Update cls_pos for the new shorter sequence
+                cls_pos = x_patches.shape[1] // 2
 
             # 4) reassemble with CLS in middle → [B, P+1, C]
             x = torch.cat([

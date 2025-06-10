@@ -4,7 +4,6 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:2
-
 #SBATCH --gpu-freq=high # Request high priority GPU access
 
 #––– error‐trap boilerplate –––

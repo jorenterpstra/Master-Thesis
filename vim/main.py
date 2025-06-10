@@ -231,6 +231,7 @@ def get_args_parser():
     parser.set_defaults(if_random_token_rank=False)
 
     parser.add_argument('--local-rank', default=0, type=int)
+    parser.add_argument('--reduction', default='full', type=str, choices=['full', 'half', 'quarter'],)
     parser.add_argument('--debug', action='store_true', help='debug mode')
     parser.set_defaults(debug=False)
     return parser
@@ -330,7 +331,8 @@ def main(args):
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
         img_size=args.input_size,
-        debug=args.debug
+        debug=args.debug,
+        reduction=args.reduction,
     )
 
                     
