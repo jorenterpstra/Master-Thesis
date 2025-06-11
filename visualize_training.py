@@ -22,10 +22,20 @@ def plot_training_progress(data_list, labels, n_epoch, save_path, save_name):
     data_list: List of dictionaries containing training data for multiple runs
     labels: List of labels for each run
     n_epoch: Number of final epochs to plot in the fourth subplot
+             (if 0, only loss and top-1 accuracy plots are shown)
     save_path: Directory to save the plot
     save_name: Name of the saved plot
     """
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    # Determine layout based on n_epoch
+    if n_epoch == 0:
+        # Only show loss and top-1 accuracy
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        ax1, ax2 = axes
+    else:
+        # Show all four plots
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        ax1, ax2 = axes[0, 0], axes[0, 1]
+        ax3, ax4 = axes[1, 0], axes[1, 1]
     
     # Define colors and line styles for different runs
     colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k', 'orange', 'purple', 'brown']
@@ -33,9 +43,7 @@ def plot_training_progress(data_list, labels, n_epoch, save_path, save_name):
     test_styles = ['--', '--', '--', '--', '--']
     
     # First subplot: Loss
-    ax1 = axes[0, 0]
     ax1_twin = ax1.twinx()  # Create a secondary y-axis
-    
     lines = []
     
     for i, (data, label) in enumerate(zip(data_list, labels)):
@@ -66,13 +74,9 @@ def plot_training_progress(data_list, labels, n_epoch, save_path, save_name):
     ax1_twin.set_ylabel('Learning Rate', fontsize=10, color='gray')
     ax1_twin.tick_params(axis='y', labelcolor='gray')
     ax1.grid(True, linestyle='--', alpha=0.7)
-    
-    # Combine legends from both axes
     ax1.legend(lines, [line.get_label() for line in lines], loc='upper right', fontsize='small')
     
     # Second subplot: Top-1 Accuracy
-    ax2 = axes[0, 1]
-    
     for i, (data, label) in enumerate(zip(data_list, labels)):
         color_idx = i % len(colors)
         
@@ -91,51 +95,49 @@ def plot_training_progress(data_list, labels, n_epoch, save_path, save_name):
     ax2.grid(True, linestyle='--', alpha=0.7)
     ax2.legend(loc='lower right', fontsize='small')
     
-    # Third subplot: Top-5 Accuracy
-    ax3 = axes[1, 0]
-    
-    for i, (data, label) in enumerate(zip(data_list, labels)):
-        color_idx = i % len(colors)
+    # Only create the remaining plots if n_epoch > 0
+    if n_epoch > 0:
+        # Third subplot: Top-5 Accuracy
+        for i, (data, label) in enumerate(zip(data_list, labels)):
+            color_idx = i % len(colors)
+            
+            train_acc5 = data['train_acc5']
+            test_acc5 = data['test_acc5']
+            epoch = data['epoch']
+            
+            ax3.plot(epoch, train_acc5, color=colors[color_idx], linestyle=train_styles[0], 
+                   label=f'{label} train')
+            ax3.plot(epoch, test_acc5, color=colors[color_idx], linestyle=test_styles[0], 
+                   label=f'{label} test')
         
-        train_acc5 = data['train_acc5']
-        test_acc5 = data['test_acc5']
-        epoch = data['epoch']
+        ax3.set_title('Top-5 Accuracy', fontsize=12)
+        ax3.set_xlabel('Epoch', fontsize=10)
+        ax3.set_ylabel('Accuracy (%)', fontsize=10)
+        ax3.grid(True, linestyle='--', alpha=0.7)
+        ax3.legend(loc='lower right', fontsize='small')
         
-        ax3.plot(epoch, train_acc5, color=colors[color_idx], linestyle=train_styles[0], 
-               label=f'{label} train')
-        ax3.plot(epoch, test_acc5, color=colors[color_idx], linestyle=test_styles[0], 
-               label=f'{label} test')
-    
-    ax3.set_title('Top-5 Accuracy', fontsize=12)
-    ax3.set_xlabel('Epoch', fontsize=10)
-    ax3.set_ylabel('Accuracy (%)', fontsize=10)
-    ax3.grid(True, linestyle='--', alpha=0.7)
-    ax3.legend(loc='lower right', fontsize='small')
-    
-    # Fourth subplot: Recent Loss Progress
-    ax4 = axes[1, 1]
-    
-    for i, (data, label) in enumerate(zip(data_list, labels)):
-        color_idx = i % len(colors)
+        # Fourth subplot: Recent Loss Progress
+        for i, (data, label) in enumerate(zip(data_list, labels)):
+            color_idx = i % len(colors)
+            
+            train_loss = data['train_loss']
+            test_loss = data['test_loss']
+            epoch = data['epoch']
+            
+            # Get the last n_epoch epochs or all if fewer are available
+            last_n = min(n_epoch, len(epoch))
+            last_epochs = epoch[-last_n:]
+            
+            ax4.plot(last_epochs, train_loss[-last_n:], color=colors[color_idx], linestyle=train_styles[0], 
+                   label=f'{label} train')
+            ax4.plot(last_epochs, test_loss[-last_n:], color=colors[color_idx], linestyle=test_styles[0], 
+                   label=f'{label} test')
         
-        train_loss = data['train_loss']
-        test_loss = data['test_loss']
-        epoch = data['epoch']
-        
-        # Get the last n_epoch epochs or all if fewer are available
-        last_n = min(n_epoch, len(epoch))
-        last_epochs = epoch[-last_n:]
-        
-        ax4.plot(last_epochs, train_loss[-last_n:], color=colors[color_idx], linestyle=train_styles[0], 
-               label=f'{label} train')
-        ax4.plot(last_epochs, test_loss[-last_n:], color=colors[color_idx], linestyle=test_styles[0], 
-               label=f'{label} test')
-    
-    ax4.set_title(f'Loss (Last {n_epoch} epochs)', fontsize=12)
-    ax4.set_xlabel('Epoch', fontsize=10)
-    ax4.set_ylabel('Loss', fontsize=10)
-    ax4.grid(True, linestyle='--', alpha=0.7)
-    ax4.legend(loc='upper right', fontsize='small')
+        ax4.set_title(f'Loss (Last {n_epoch} epochs)', fontsize=12)
+        ax4.set_xlabel('Epoch', fontsize=10)
+        ax4.set_ylabel('Loss', fontsize=10)
+        ax4.grid(True, linestyle='--', alpha=0.7)
+        ax4.legend(loc='upper right', fontsize='small')
     
     plt.tight_layout(pad=2.0)
     plt.savefig(os.path.join(save_path, save_name + '.png'), dpi=300)
