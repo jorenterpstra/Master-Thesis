@@ -29,7 +29,7 @@ def plot_training_progress(data_list, labels, n_epoch, save_path, save_name):
     # Determine layout based on n_epoch
     if n_epoch == 0:
         # Only show loss and top-1 accuracy
-        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
         ax1, ax2 = axes
     else:
         # Show all four plots
@@ -39,8 +39,8 @@ def plot_training_progress(data_list, labels, n_epoch, save_path, save_name):
     
     # Define colors and line styles for different runs
     colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k', 'orange', 'purple', 'brown']
-    train_styles = ['-', '-', '-', '-', '-']
-    test_styles = ['--', '--', '--', '--', '--']
+    test_styles = ['-', '-', '-', '-', '-']
+    train_styles = ['dotted', 'dotted', 'dotted', 'dotted', 'dotted']
     
     # First subplot: Loss
     ax1_twin = ax1.twinx()  # Create a secondary y-axis
