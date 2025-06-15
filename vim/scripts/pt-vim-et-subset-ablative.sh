@@ -41,7 +41,7 @@ export NCCL_P2P_DISABLE=1
 # export PYTHONUNBUFFERED=1
 
 export MASTER_ADDR=$(hostname)
-export MASTER_PORT=29501
+export MASTER_PORT=29505
 # export CUDA_VISIBLE_DEVICES=2,3
 
 # # Minimum required memory in MB
