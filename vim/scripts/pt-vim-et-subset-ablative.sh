@@ -11,6 +11,7 @@ set -o errexit       # exit on any error
 set -o errtrace      # ensure ERR trap is inherited by functions, subshells
 
 dump_gpus_and_procs() {
+  sleep 10
   echo
   echo "=================== GPU STATUS AT FAILURE ==================="
   date
@@ -40,7 +41,7 @@ export NCCL_P2P_DISABLE=1
 # export PYTHONUNBUFFERED=1
 
 export MASTER_ADDR=$(hostname)
-export MASTER_PORT=29501
+export MASTER_PORT=29502
 # export CUDA_VISIBLE_DEVICES=2,3
 
 # # Minimum required memory in MB
@@ -88,8 +89,8 @@ python -m torch.distributed.run \
     --data-path /storage/scratch/6403840/data/imagenet-tiny \
     --heatmap-path /storage/scratch/6403840/data/imagenet-tiny \
     --return-rankings \
-    --output_dir ./output/vim_extra_tiny_custom_transforms_quarter_patch \
-    --reduction quarter \
+    --output_dir ./output/vim_extra_tiny_custom_transforms_half_patch \
+    --reduction half \
     --no_amp \
     --pin-mem \
     --mixup 0.0 \
