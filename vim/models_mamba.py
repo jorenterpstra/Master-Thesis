@@ -485,6 +485,7 @@ class VisionMamba(nn.Module):
                 x_cls,
                 x_patches[:, cls_pos:, :]
             ], dim=1)
+            token_position = cls_pos  # Update token_position to the new CLS position
 
 
 
