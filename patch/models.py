@@ -462,5 +462,5 @@ if __name__ == "__main__":
             print(f"Test loading failed: {e}")
     
     # Run loading test
-    test_loading()
+    #test_loading()
 
