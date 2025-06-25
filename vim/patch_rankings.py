@@ -8,6 +8,7 @@ import csv
 import torch
 from tqdm import tqdm
 import sys
+import cv2
 
 # Add parent directory to path to import from vim
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,8 +36,10 @@ def create_identity_transform():
     from albumentations.pytorch import ToTensorV2
     
     return A.Compose([
-        ToTensorV2(always_apply=True),
-    ])
+        # resize to 224x224, no normalization
+        A.Resize(height=224, width=224, interpolation=cv2.INTER_CUBIC),
+        ToTensorV2(),
+    ], additional_targets={'heatmap': 'mask'})
 
 def main():
     # Parse arguments
