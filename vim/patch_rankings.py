@@ -61,7 +61,7 @@ def main():
         heatmap_root=heatmap_root,
         transform=identity_transform,
         return_rankings=True,
-        return_heatmap=False,
+        return_heatmap=True,
         heatmap_extension=args.heatmap_extension
     )
     
@@ -76,7 +76,7 @@ def main():
         num_patches = 196  # 14x14 patches for 224x224 images with 16x16 patches
         header = ['filename'] + [f'patch_{i}' for i in range(num_patches)]
         writer.writerow(header)
-        
+        summed_heatmap = torch.zeros((224, 224, 3), dtype=torch.float32)
         # Process all images and write to CSV
         for idx in tqdm(range(len(dataset)), desc="Processing images"):
             # Get the image path from the dataset
@@ -85,15 +85,23 @@ def main():
             
             # Get the image, target, and ranking
             try:
-                _, _, ranking = dataset[idx]
+                _, _, ranking, heatmap = dataset[idx]
                 
                 # Convert ranking tensor to list and write to CSV
                 ranking_list = ranking.cpu().numpy().tolist()
                 writer.writerow([filename] + ranking_list)
+                # Accumulate heatmap
+                summed_heatmap += heatmap.squeeze(0).cpu()
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
     
     print(f"Rankings saved to {args.output_csv}")
+    # Save the summed heatmap as  an image
+    summed_heatmap = (summed_heatmap / summed_heatmap.max() * 255).byte().numpy()
+    summed_heatmap = cv2.applyColorMap(summed_heatmap, cv2.COLORMAP_JET)
+    heatmap_output_path = os.path.join(os.path.dirname(args.output_csv), 'summed_heatmap.png')
+    cv2.imwrite(heatmap_output_path, summed_heatmap)
+    print(f"Summed heatmap saved to {heatmap_output_path}")
 
 if __name__ == '__main__':
     main()
