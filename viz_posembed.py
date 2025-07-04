@@ -117,7 +117,7 @@ def visualize_pos_embedding_cosine(pos_embed, patch_size=16, grid_size=14):
 
 
 
-def plot_cosine_similarity(cosine_sim, grid_size=14, patch_grid=8):
+def plot_cosine_similarity(cosine_sim, grid_size=14, patch_grid=14):
     """
     Plot cosine similarity for each patch as a grid of subplots.
     Each subplot shows the similarity of one patch to all others.
