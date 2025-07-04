@@ -152,7 +152,6 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
     cbar_ax = fig.add_axes([0.90, 0.15, 0.015, 0.7])
     fig.colorbar(im, cax=cbar_ax, label='Cosine similarity')
     fig.suptitle("Position embedding similarity (all patches)", fontsize=18)
-    plt.tight_layout(rect=[0, 0, 0.88, 1])
     plt.savefig("posembed_cosine_similarity_all.png", dpi=200)
     plt.show()
 
@@ -172,7 +171,7 @@ def main(checkpoint_path, val_dir):
     # Visualize position embeddings
     pos_embed_rgb = visualize_pos_embedding_pca(pos_embeds)
     pos_embed_cosine = visualize_pos_embedding_cosine(pos_embeds)
-    plot_cosine_similarity(pos_embed_cosine, np.arange(0, pos_embeds.shape[1], 2))
+    plot_cosine_similarity(pos_embed_cosine)
     
     # Plot results
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
