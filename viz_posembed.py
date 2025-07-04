@@ -128,36 +128,31 @@ def main(checkpoint_path, val_dir):
     x_cls    = pos_embed[:, cls_pos:cls_pos+1, :]  # [B, 1, C]
     x_after  = pos_embed[:, cls_pos+1:, :]    # [B, P - cls_pos, C]
 
-    pos_embed = torch.cat((x_before, x_after), dim=1)  # [B, P, C]
+    pos_embeds = torch.cat((x_before, x_after), dim=1)  # [B, P, C]
     
     # Ensure position embedding is on CPU
-    pos_embed = pos_embed.detach().cpu()
-    
-    
-    # Get a random validation image
-    img_tensor, original_img, img_path = get_random_val_image(val_dir)
-    
+    pos_embeds = pos_embeds.detach().cpu()
     # Visualize position embeddings
-    pos_embed_rgb = visualize_pos_embedding_pca(pos_embed)
-    pos_embed_cosine = visualize_pos_embedding_cosine(pos_embed)
+    pos_embed_rgb = visualize_pos_embedding_pca(pos_embeds)
+    pos_embed_cosine = visualize_pos_embedding_cosine(pos_embeds)
     
     # Plot results
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     
-    # Original image
-    axes[0].imshow(original_img)
-    axes[0].set_title(f"Random Image: {os.path.basename(img_path)}")
-    axes[0].axis('off')
+    # # Original image
+    # axes[0].imshow(original_img)
+    # axes[0].set_title(f"Random Image: {os.path.basename(img_path)}")
+    # axes[0].axis('off')
     
     # Position embedding visualization
-    axes[1].imshow(pos_embed_rgb)
-    axes[1].set_title("Position Embedding\n(PCA visualization)")
-    axes[1].axis('off')
+    axes[0].imshow(pos_embed_rgb)
+    axes[0].set_title("Position Embedding\n(PCA visualization)")
+    axes[0].axis('off')
 
-    # # Cosine similarity visualization
-    # axes[2].imshow(pos_embed_cosine.mean(axis=2), cmap='viridis')
-    # axes[2].set_title("Position Embedding\n(Cosine Similarity)")
-    # axes[2].axis('off')
+    # Cosine similarity visualization
+    axes[1].imshow(pos_embed_cosine.mean(axis=2), cmap='viridis')
+    axes[1].set_title("Position Embedding\n(Cosine Similarity)")
+    axes[1].axis('off')
     
     plt.tight_layout()
     plt.savefig("posembed_visualization.png")
