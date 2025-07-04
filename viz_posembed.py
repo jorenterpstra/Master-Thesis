@@ -132,7 +132,11 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         ax = axes[row, col]
         sim_map = cosine_sim[idx]
         im = ax.imshow(sim_map, cmap='viridis', vmin=0, vmax=1)
-        ax.axis('off')  # Hide all ticks and spines
+        
+        # Hide ticks but keep axis labels if needed
+        ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
         # Only set labels at the bottom row and leftmost column
         if row == n_rows - 1:
