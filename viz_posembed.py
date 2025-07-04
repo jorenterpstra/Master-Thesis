@@ -131,10 +131,10 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         row, col = divmod(idx, n_cols)
         ax = axes[row, col]
         sim_map = cosine_sim[idx]
-        im = ax.imshow(sim_map, cmap='viridis', vmin=0, vmax=1)
+        im = ax.imshow(sim_map, vmin=0, vmax=1)
         # make the patch with the highest similarity red
-        max_idx = np.unravel_index(np.argmax(sim_map), sim_map.shape)
-        ax.add_patch(plt.Rectangle((max_idx[1]-0.5, max_idx[0]-0.5), 1, 1, edgecolor='none', facecolor='black', lw=2))
+        # max_idx = np.unravel_index(np.argmax(sim_map), sim_map.shape)
+        # ax.add_patch(plt.Rectangle((max_idx[1]-0.5, max_idx[0]-0.5), 1, 1, edgecolor='none', facecolor='black', lw=2))
         
         # Hide ticks but keep axis labels if needed
         ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
