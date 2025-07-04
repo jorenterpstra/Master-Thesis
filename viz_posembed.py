@@ -69,7 +69,7 @@ def visualize_pos_embedding_pca(pos_embed, patch_size=16, grid_size=14):
     # Check if pos_embed includes class tokens
     
     # Convert to numpy for visualization
-    patch_pos_embed = patch_pos_embed.numpy()
+    patch_pos_embed = pos_embed.numpy()
     
     # Use PCA to reduce dimensions for visualization
     from sklearn.decomposition import PCA
