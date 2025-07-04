@@ -99,26 +99,62 @@ def visualize_pos_embedding_pca(pos_embed, patch_size=16, grid_size=14):
     return pos_embed_pca
 
 def visualize_pos_embedding_cosine(pos_embed, patch_size=16, grid_size=14):
-    """Visualize position embeddings using cosine similarity"""
-    # pos embed does not include class tokens
-    num_patches = grid_size * grid_size
-    has_cls_token = pos_embed.shape[1] > num_patches
-    # Extract only the patch position embeddings (skip class token if present)
-    if has_cls_token:
-        patch_pos_embed = pos_embed[0, 1:, :].reshape(grid_size, grid_size, -1)
-    else:
-        patch_pos_embed = pos_embed[0, :, :].reshape(grid_size, grid_size, -1)
-    # Convert to numpy for visualization
+    """Visualize position embeddings using cosine similarity per patch"""
+    # Convert to numpy for cosine similarity calculation
     patch_pos_embed = patch_pos_embed.numpy()
-    # Compute cosine similarity
+    # Calculate cosine similarity between each patch and the other patches
     from sklearn.metrics.pairwise import cosine_similarity
-    flattened = patch_pos_embed.reshape(-1, patch_pos_embed.shape[-1])
+    # Flatten spatial dimensions
+    embed_dim = patch_pos_embed.shape[-1]
+    flattened = patch_pos_embed.reshape(-1, embed_dim)
+    # Calculate cosine similarity matrix
     cosine_sim = cosine_similarity(flattened)
     # Reshape back to spatial grid
-    cosine_sim = cosine_sim.reshape(grid_size, grid_size, grid_size, grid_size)
-    # Normalize to [0,1] for visualization
+    cosine_sim = cosine_sim.reshape(grid_size, grid_size, grid_size * grid_size)
+    # Normalize cosine similarity values to [0, 1]
     cosine_sim = (cosine_sim - cosine_sim.min()) / (cosine_sim.max() - cosine_sim.min())
     return cosine_sim
+
+
+
+def plot_cosine_similarity(cosine_sim, grid_size=14, patch_grid=8):
+    """
+    Plot cosine similarity for each patch as a grid of subplots.
+    Each subplot shows the similarity of one patch to all others.
+    patch_grid: the grid size for display (e.g. 8 for 8x8 as in your example).
+    """
+    import matplotlib.pyplot as plt
+
+    # If you want to show only a subset (e.g. 8x8), select the center region
+    if grid_size > patch_grid:
+        start = (grid_size - patch_grid) // 2
+        end = start + patch_grid
+        cosine_sim = cosine_sim[start:end, start:end]
+        grid_size = patch_grid
+
+    fig, axes = plt.subplots(grid_size, grid_size, figsize=(grid_size*2, grid_size*2))
+    vmin, vmax = -1, 1  # For cosine similarity
+
+    for i in range(grid_size):
+        for j in range(grid_size):
+            ax = axes[i, j]
+            sim_map = cosine_sim[i, j].reshape(grid_size, grid_size)
+            im = ax.imshow(sim_map, cmap='viridis', vmin=vmin, vmax=vmax)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if i == 0:
+                ax.set_title(str(j+1), fontsize=10)
+            if j == 0:
+                ax.set_ylabel(str(i+1), fontsize=10, rotation=0, labelpad=15, va='center')
+    # Add a colorbar
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7])
+    fig.colorbar(im, cax=cbar_ax, label='Cosine similarity')
+    fig.suptitle("Position embedding similarity", fontsize=16)
+    plt.tight_layout()
+    plt.savefig("posembed_cosine_similarity.png")
+    plt.show()
+    
 
 def main(checkpoint_path, val_dir):
     # Load model and extract position embeddings
@@ -135,6 +171,7 @@ def main(checkpoint_path, val_dir):
     # Visualize position embeddings
     pos_embed_rgb = visualize_pos_embedding_pca(pos_embeds)
     pos_embed_cosine = visualize_pos_embedding_cosine(pos_embeds)
+    plot_cosine_similarity(pos_embed_cosine)
     
     # Plot results
     print(pos_embeds.shape)
@@ -149,11 +186,6 @@ def main(checkpoint_path, val_dir):
     axes[0].imshow(pos_embed_rgb)
     axes[0].set_title("Position Embedding\n(PCA visualization)")
     axes[0].axis('off')
-
-    # Cosine similarity visualization
-    axes[1].imshow(pos_embed_cosine.mean(axis=2), cmap='viridis')
-    axes[1].set_title("Position Embedding\n(Cosine Similarity)")
-    axes[1].axis('off')
     
     plt.tight_layout()
     plt.savefig("posembed_visualization.png")
