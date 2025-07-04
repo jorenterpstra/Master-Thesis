@@ -201,6 +201,8 @@ def main(checkpoint_path, val_dir):
     # Visualize position embeddings
     pos_embed_rgb = visualize_pos_embedding_pca(pos_embeds)
     pos_embed_cosine = visualize_pos_embedding_cosine(pos_embeds)
+    # Plot Pearson correlation
+    plot_pearson(pos_embeds)
     plot_cosine_similarity(pos_embed_cosine)
     
     # Plot results
