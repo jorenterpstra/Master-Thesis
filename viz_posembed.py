@@ -126,6 +126,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
     if not isinstance(cosine_sim, np.ndarray):
         cosine_sim = np.array(cosine_sim)
     num_patches = cosine_sim.shape[0]
+    print("cosine_sim shape:", cosine_sim.shape)
     # Determine subplot grid size (try to make it as square as possible)
     n_cols = grid_size
     n_rows = grid_size
