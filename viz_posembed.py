@@ -118,6 +118,7 @@ def main(checkpoint_path, val_dir):
     axes[1].axis('off')
     
     plt.tight_layout()
+    plt.savefig("posembed_visualization.png")
     plt.show()
     
     # Return the position embedding for further analysis
