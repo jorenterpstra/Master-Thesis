@@ -166,6 +166,7 @@ def main(checkpoint_path, val_dir):
 
     pos_embeds = torch.cat((x_before, x_after), dim=1)  # [B, P, C]
     
+    print("Without class token", pos_embeds.shape)
     # Ensure position embedding is on CPU
     pos_embeds = pos_embeds.detach().cpu()
     # Visualize position embeddings
@@ -174,7 +175,6 @@ def main(checkpoint_path, val_dir):
     plot_cosine_similarity(pos_embed_cosine)
     
     # Plot results
-    print(pos_embeds.shape)
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     
     # # Original image
@@ -190,9 +190,6 @@ def main(checkpoint_path, val_dir):
     plt.tight_layout()
     plt.savefig("posembed_visualization.png")
     plt.show()
-    
-    # Return the position embedding for further analysis
-    return pos_embed, img_tensor, img_path
 
 if __name__ == "__main__":
     # Default paths - update these to your actual paths
@@ -204,6 +201,4 @@ if __name__ == "__main__":
     checkpoint_path = sys.argv[1] if len(sys.argv) > 1 else default_checkpoint
     val_dir = sys.argv[2] if len(sys.argv) > 2 else default_val_dir
     
-    pos_embed, img_tensor, img_path = main(checkpoint_path, val_dir)
-    print(f"Position embedding shape: {pos_embed.shape}")
-    print(f"Sample image path: {img_path}")
+    main(checkpoint_path, val_dir)
