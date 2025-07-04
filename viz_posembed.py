@@ -64,7 +64,7 @@ def get_random_val_image(val_dir):
     
     return img_tensor, img, img_path
 
-def visualize_pos_embedding(pos_embed, patch_size=16, grid_size=14):
+def visualize_pos_embedding_pca(pos_embed, patch_size=16, grid_size=14):
     """Visualize position embeddings using PCA"""
     # Check if pos_embed includes class tokens
     num_patches = grid_size * grid_size
@@ -98,15 +98,48 @@ def visualize_pos_embedding(pos_embed, patch_size=16, grid_size=14):
     
     return pos_embed_pca
 
+def visualize_pos_embedding_cosine(pos_embed, patch_size=16, grid_size=14):
+    """Visualize position embeddings using cosine similarity"""
+    # pos embed does not include class tokens
+    num_patches = grid_size * grid_size
+    has_cls_token = pos_embed.shape[1] > num_patches
+    # Extract only the patch position embeddings (skip class token if present)
+    if has_cls_token:
+        patch_pos_embed = pos_embed[0, 1:, :].reshape(grid_size, grid_size, -1)
+    else:
+        patch_pos_embed = pos_embed[0, :, :].reshape(grid_size, grid_size, -1)
+    # Convert to numpy for visualization
+    patch_pos_embed = patch_pos_embed.numpy()
+    # Compute cosine similarity
+    from sklearn.metrics.pairwise import cosine_similarity
+    flattened = patch_pos_embed.reshape(-1, patch_pos_embed.shape[-1])
+    cosine_sim = cosine_similarity(flattened)
+    # Reshape back to spatial grid
+    cosine_sim = cosine_sim.reshape(grid_size, grid_size, grid_size, grid_size)
+    # Normalize to [0,1] for visualization
+    cosine_sim = (cosine_sim - cosine_sim.min()) / (cosine_sim.max() - cosine_sim.min())
+    return cosine_sim
+
 def main(checkpoint_path, val_dir):
     # Load model and extract position embeddings
     pos_embed, model = load_model_and_get_pos_embed(checkpoint_path)
+    cls_pos = pos_embed.shape[0] // 2 # class token is at the middle of the position embeddings
+    x_before = pos_embed[:, :cls_pos, :]      # [B, cls_pos, C]
+    x_cls    = pos_embed[:, cls_pos:cls_pos+1, :]  # [B, 1, C]
+    x_after  = pos_embed[:, cls_pos+1:, :]    # [B, P - cls_pos, C]
+
+    pos_embed = torch.cat((x_before, x_after), dim=1)  # [B, P, C]
+    
+    # Ensure position embedding is on CPU
+    pos_embed = pos_embed.detach().cpu()
+    
     
     # Get a random validation image
     img_tensor, original_img, img_path = get_random_val_image(val_dir)
     
     # Visualize position embeddings
-    pos_embed_rgb = visualize_pos_embedding(pos_embed)
+    pos_embed_rgb = visualize_pos_embedding_pca(pos_embed)
+    pos_embed_cosine = visualize_pos_embedding_cosine(pos_embed)
     
     # Plot results
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
@@ -120,6 +153,11 @@ def main(checkpoint_path, val_dir):
     axes[1].imshow(pos_embed_rgb)
     axes[1].set_title("Position Embedding\n(PCA visualization)")
     axes[1].axis('off')
+
+    # # Cosine similarity visualization
+    # axes[2].imshow(pos_embed_cosine.mean(axis=2), cmap='viridis')
+    # axes[2].set_title("Position Embedding\n(Cosine Similarity)")
+    # axes[2].axis('off')
     
     plt.tight_layout()
     plt.savefig("posembed_visualization.png")
