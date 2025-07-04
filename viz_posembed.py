@@ -101,7 +101,7 @@ def visualize_pos_embedding_pca(pos_embed, patch_size=16, grid_size=14):
 def visualize_pos_embedding_cosine(pos_embed, patch_size=16, grid_size=14):
     """Visualize position embeddings using cosine similarity per patch"""
     # Convert to numpy for cosine similarity calculation
-    patch_pos_embed = patch_pos_embed.numpy()
+    patch_pos_embed = pos_embed.numpy()
     # Calculate cosine similarity between each patch and the other patches
     from sklearn.metrics.pairwise import cosine_similarity
     # Flatten spatial dimensions
