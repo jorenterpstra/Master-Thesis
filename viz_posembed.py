@@ -212,9 +212,9 @@ def main(checkpoint_path, val_dir):
     # axes[0].axis('off')
     
     # Position embedding visualization
-    axes[0].imshow(pos_embed_rgb)
-    axes[0].set_title("Position Embedding\n(PCA visualization)")
-    axes[0].axis('off')
+    axes.imshow(pos_embed_rgb)
+    axes.set_title("Position Embedding\n(PCA visualization)")
+    axes.axis('off')
     
     plt.tight_layout()
     plt.savefig("posembed_visualization.png")
