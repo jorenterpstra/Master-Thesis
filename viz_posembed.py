@@ -131,15 +131,15 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         ax = axes[row, col]
         sim_map = cosine_sim[idx]
         im = ax.imshow(sim_map, cmap='viridis', vmin=0, vmax=1)
-        # Set x/y ticks to show patch indices
-        ax.set_xticks([0, grid_size - 1])
-        ax.set_yticks([0, grid_size - 1])
+        # # Set x/y ticks to show patch indices
+        # ax.set_xticks([0, grid_size - 1])
+        # ax.set_yticks([0, grid_size - 1])
         if row == n_rows - 1:
-            ax.set_xlabel(f"col {col}", fontsize=6)
+            ax.set_xlabel(f"col {col}", fontsize=9)
         else:
             ax.set_xlabel("")
         if col == 0:
-            ax.set_ylabel(f"row {row}", fontsize=6)
+            ax.set_ylabel(f"row {row}", fontsize=9)
         else:
             ax.set_ylabel("")
         ax.tick_params(axis='both', which='both', length=0, labelsize=6)
@@ -158,7 +158,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
 def main(checkpoint_path, val_dir):
     # Load model and extract position embeddings
     pos_embed, model = load_model_and_get_pos_embed(checkpoint_path)
-    cls_pos = pos_embed.shape[0] // 2 + 1 # class token is at the middle of the position embeddings
+    cls_pos = pos_embed.shape[1] // 2 # class token is at the middle of the position embeddings
     x_before = pos_embed[:, :cls_pos, :]      # [B, cls_pos, C]
     x_cls    = pos_embed[:, cls_pos:cls_pos+1, :]  # [B, 1, C]
     x_after  = pos_embed[:, cls_pos+1:, :]    # [B, P - cls_pos, C]
