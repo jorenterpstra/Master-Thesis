@@ -131,10 +131,18 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         ax = axes[row, col]
         sim_map = cosine_sim[idx]
         im = ax.imshow(sim_map, cmap='viridis', vmin=0, vmax=1)
-        i, j = divmod(idx, grid_size)
-        ax.set_title(f"({i},{j})", fontsize=6)
-        ax.set_xticks([])
-        ax.set_yticks([])
+        # Set x/y ticks to show patch indices
+        ax.set_xticks([0, grid_size - 1])
+        ax.set_yticks([0, grid_size - 1])
+        if row == n_rows - 1:
+            ax.set_xlabel(f"col {col}", fontsize=6)
+        else:
+            ax.set_xlabel("")
+        if col == 0:
+            ax.set_ylabel(f"row {row}", fontsize=6)
+        else:
+            ax.set_ylabel("")
+        ax.tick_params(axis='both', which='both', length=0, labelsize=6)
     # Hide unused subplots (shouldn't be any, but just in case)
     for idx in range(num_patches, n_rows * n_cols):
         row, col = divmod(idx, n_cols)
