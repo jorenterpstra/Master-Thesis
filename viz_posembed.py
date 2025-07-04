@@ -67,14 +67,6 @@ def get_random_val_image(val_dir):
 def visualize_pos_embedding_pca(pos_embed, patch_size=16, grid_size=14):
     """Visualize position embeddings using PCA"""
     # Check if pos_embed includes class tokens
-    num_patches = grid_size * grid_size
-    has_cls_token = pos_embed.shape[1] > num_patches
-    
-    # Extract only the patch position embeddings (skip class token if present)
-    if has_cls_token:
-        patch_pos_embed = pos_embed[0, 1:, :].reshape(grid_size, grid_size, -1)
-    else:
-        patch_pos_embed = pos_embed[0, :, :].reshape(grid_size, grid_size, -1)
     
     # Convert to numpy for visualization
     patch_pos_embed = patch_pos_embed.numpy()
