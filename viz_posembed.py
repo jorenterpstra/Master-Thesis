@@ -124,7 +124,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
     n_cols = grid_size
     n_rows = grid_size
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 1.1, n_rows * 1.1))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols, n_rows))
     axes = np.array(axes).reshape(n_rows, n_cols)
 
     for idx in range(num_patches):
