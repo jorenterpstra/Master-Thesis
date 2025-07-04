@@ -4,6 +4,7 @@ import numpy as np
 import os
 import random
 from PIL import Image
+import scipy.stats
 import torchvision.transforms as transforms
 from vim.models_mamba import vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2
 
@@ -154,6 +155,34 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
     fig.suptitle("Position embedding similarity (all patches)", fontsize=18)
     plt.tight_layout()
     plt.savefig("posembed_cosine_similarity_all.png", dpi=300)
+    plt.show()
+
+def plot_pearson(pos_embeds):
+    # pos_embeds: [1, num_patches, dim]
+    pos_embeds_np = pos_embeds.squeeze(0).numpy()  # [num_patches, dim]
+    grid_size = int(np.sqrt(pos_embeds_np.shape[0]))
+
+    coords = np.array([(i, j) for i in range(grid_size) for j in range(grid_size)])  # [num_patches, 2]
+    x_coords = coords[:, 1]
+    y_coords = coords[:, 0]
+
+    cor_x = []
+    cor_y = []
+    for d in range(pos_embeds_np.shape[1]):
+        cor_x.append(abs(scipy.stats.pearsonr(pos_embeds_np[:, d], x_coords)[0]))
+        cor_y.append(abs(scipy.stats.pearsonr(pos_embeds_np[:, d], y_coords)[0]))
+    cor_x = np.array(cor_x)
+    cor_y = np.array(cor_y)
+
+    plt.figure(figsize=(10,4))
+    plt.plot(cor_x, label='|corr with x|')
+    plt.plot(cor_y, label='|corr with y|')
+    plt.xlabel('Embedding dimension')
+    plt.ylabel('Absolute Pearson correlation')
+    plt.title('Correlation of position embedding dimensions with spatial coordinates')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("posembed_pearson_correlation.png", dpi=300)
     plt.show()
 
 def main(checkpoint_path, val_dir):
