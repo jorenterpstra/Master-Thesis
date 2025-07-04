@@ -99,67 +99,69 @@ def visualize_pos_embedding_pca(pos_embed, patch_size=16, grid_size=14):
     return pos_embed_pca
 
 def visualize_pos_embedding_cosine(pos_embed, patch_size=16, grid_size=14):
-    """Visualize position embeddings using cosine similarity per patch"""
+    """Visualize position embeddings using cosine similarity for every second patch (even indices)"""
     # Convert to numpy for cosine similarity calculation
     patch_pos_embed = pos_embed.numpy()
-    # Calculate cosine similarity between each patch and the other patches
-    from sklearn.metrics.pairwise import cosine_similarity
     # Flatten spatial dimensions
     embed_dim = patch_pos_embed.shape[-1]
     flattened = patch_pos_embed.reshape(-1, embed_dim)
-    # Calculate cosine similarity matrix
-    cosine_sim = cosine_similarity(flattened)
-    # Reshape back to spatial grid
-    cosine_sim = cosine_sim.reshape(grid_size, grid_size, grid_size * grid_size)
+    # Select only even-indexed patches
+    even_indices = np.arange(0, grid_size * grid_size, 2)
+    flattened_even = flattened[even_indices]
+    # Calculate cosine similarity between each selected patch and all patches
+    from sklearn.metrics.pairwise import cosine_similarity
+    cosine_sim = cosine_similarity(flattened_even, flattened)
+    # Reshape for visualization: [num_even_patches, grid_size, grid_size]
+    cosine_sim = cosine_sim.reshape(len(even_indices), grid_size, grid_size)
     # Normalize cosine similarity values to [0, 1]
     cosine_sim = (cosine_sim - cosine_sim.min()) / (cosine_sim.max() - cosine_sim.min())
-    return cosine_sim
+    return cosine_sim, even_indices
 
 
-
-def plot_cosine_similarity(cosine_sim, grid_size=14, patch_grid=14):
+def plot_cosine_similarity(cosine_sim, even_indices, grid_size=14):
     """
-    Plot cosine similarity for each patch as a grid of subplots.
-    Each subplot shows the similarity of one patch to all others.
-    patch_grid: the grid size for display (e.g. 8 for 8x8 as in your example).
+    Plot cosine similarity for every second patch (even indices) as a grid of subplots.
+    Each subplot shows the similarity of one selected patch to all others.
     """
     import matplotlib.pyplot as plt
 
-    # If you want to show only a subset (e.g. 8x8), select the center region
-    if grid_size > patch_grid:
-        start = (grid_size - patch_grid) // 2
-        end = start + patch_grid
-        cosine_sim = cosine_sim[start:end, start:end]
-        grid_size = patch_grid
+    num_patches = cosine_sim.shape[0]
+    # Determine subplot grid size (try to make it as square as possible)
+    n_cols = int(np.ceil(np.sqrt(num_patches)))
+    n_rows = int(np.ceil(num_patches / n_cols))
 
-    fig, axes = plt.subplots(grid_size, grid_size, figsize=(grid_size*2, grid_size*2))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 2, n_rows * 2))
+    axes = np.array(axes).reshape(n_rows, n_cols)
     vmin, vmax = -1, 1  # For cosine similarity
 
-    for i in range(grid_size):
-        for j in range(grid_size):
-            ax = axes[i, j]
-            sim_map = cosine_sim[i, j].reshape(grid_size, grid_size)
-            im = ax.imshow(sim_map, cmap='viridis', vmin=vmin, vmax=vmax)
-            ax.set_xticks([])
-            ax.set_yticks([])
-            if i == 0:
-                ax.set_title(str(j+1), fontsize=10)
-            if j == 0:
-                ax.set_ylabel(str(i+1), fontsize=10, rotation=0, labelpad=15, va='center')
+    for idx in range(num_patches):
+        row, col = divmod(idx, n_cols)
+        ax = axes[row, col]
+        sim_map = cosine_sim[idx]
+        im = ax.imshow(sim_map, cmap='viridis', vmin=0, vmax=1)
+        patch_idx = even_indices[idx]
+        i, j = divmod(patch_idx, grid_size)
+        ax.set_title(f"Patch ({i},{j})", fontsize=8)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    # Hide unused subplots
+    for idx in range(num_patches, n_rows * n_cols):
+        row, col = divmod(idx, n_cols)
+        axes[row, col].axis('off')
     # Add a colorbar
     fig.subplots_adjust(right=0.85)
     cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7])
     fig.colorbar(im, cax=cbar_ax, label='Cosine similarity')
-    fig.suptitle("Position embedding similarity", fontsize=16)
+    fig.suptitle("Position embedding similarity (even-indexed patches)", fontsize=16)
     plt.tight_layout()
-    plt.savefig("posembed_cosine_similarity.png")
+    plt.savefig("posembed_cosine_similarity_even.png")
     plt.show()
     
 
 def main(checkpoint_path, val_dir):
     # Load model and extract position embeddings
     pos_embed, model = load_model_and_get_pos_embed(checkpoint_path)
-    cls_pos = pos_embed.shape[0] // 2 # class token is at the middle of the position embeddings
+    cls_pos = pos_embed.shape[0] // 2 + 1 # class token is at the middle of the position embeddings
     x_before = pos_embed[:, :cls_pos, :]      # [B, cls_pos, C]
     x_cls    = pos_embed[:, cls_pos:cls_pos+1, :]  # [B, 1, C]
     x_after  = pos_embed[:, cls_pos+1:, :]    # [B, P - cls_pos, C]
