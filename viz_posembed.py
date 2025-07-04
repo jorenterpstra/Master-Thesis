@@ -106,7 +106,7 @@ def visualize_pos_embedding_cosine(pos_embed, grid_size=7):
     embed_dim = patch_pos_embed.shape[-1]
     flattened = patch_pos_embed.reshape(-1, embed_dim)
     # Select only even-indexed patches
-    even_indices = np.arange(0, grid_size * grid_size, 2)
+    even_indices = np.arange(0, flattened.shape[0], 2)
     flattened_even = flattened[even_indices]
     # Calculate cosine similarity between each selected patch and all patches
     from sklearn.metrics.pairwise import cosine_similarity
