@@ -174,7 +174,7 @@ def main(checkpoint_path, val_dir):
     # Visualize position embeddings
     pos_embed_rgb = visualize_pos_embedding_pca(pos_embeds)
     pos_embed_cosine = visualize_pos_embedding_cosine(pos_embeds)
-    plot_cosine_similarity(pos_embed_cosine)
+    plot_cosine_similarity(pos_embed_cosine, np.arange(0, pos_embeds.shape[1], 2))
     
     # Plot results
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
