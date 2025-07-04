@@ -98,7 +98,7 @@ def visualize_pos_embedding_pca(pos_embed, patch_size=16, grid_size=14):
     
     return pos_embed_pca
 
-def visualize_pos_embedding_cosine(pos_embed, patch_size=16, grid_size=14):
+def visualize_pos_embedding_cosine(pos_embed, grid_size=7):
     """Visualize position embeddings using cosine similarity for every second patch (even indices)"""
     # Convert to numpy for cosine similarity calculation
     patch_pos_embed = pos_embed.numpy()
