@@ -115,10 +115,10 @@ def visualize_pos_embedding_cosine(pos_embed, patch_size=16, grid_size=14):
     cosine_sim = cosine_sim.reshape(len(even_indices), grid_size, grid_size)
     # Normalize cosine similarity values to [0, 1]
     cosine_sim = (cosine_sim - cosine_sim.min()) / (cosine_sim.max() - cosine_sim.min())
-    return cosine_sim, even_indices
+    return cosine_sim
 
 
-def plot_cosine_similarity(cosine_sim, even_indices, grid_size=14):
+def plot_cosine_similarity(cosine_sim, even_indices, grid_size=7):
     """
     Plot cosine similarity for every second patch (even indices) as a grid of subplots.
     Each subplot shows the similarity of one selected patch to all others.
