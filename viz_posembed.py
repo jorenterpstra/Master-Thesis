@@ -13,7 +13,7 @@ def load_model_and_get_pos_embed(checkpoint_path):
     """
     print(f"Loading model from: {checkpoint_path}")
     # Initialize model on CPU
-    model = vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2()
+    model = vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2(num_classes=200)
     
     # Load pretrained weights
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
