@@ -135,7 +135,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         # # Set x/y ticks to show patch indices
         # ax.set_xticks([0, grid_size - 1])
         # ax.set_yticks([0, grid_size - 1])
-        ax.axes('off')  # Hide axes
+        ax.set_axis('off')  # Hide axes for cleaner look
         if row == n_rows - 1:
             ax.set_xlabel(f"col {col}", fontsize=9)
         else:
