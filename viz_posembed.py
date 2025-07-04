@@ -104,8 +104,6 @@ def visualize_pos_embedding_cosine(pos_embed, grid_size=14):
     # Reshape for visualization: [num_patches, grid_size, grid_size]
     num_patches = grid_size * grid_size
     cosine_sim = cosine_sim.reshape(num_patches, grid_size, grid_size)
-    # Normalize cosine similarity values to [0, 1]
-    cosine_sim = (cosine_sim - cosine_sim.min()) / (cosine_sim.max() - cosine_sim.min())
     return cosine_sim
 
 def plot_cosine_similarity(cosine_sim, grid_size=14):
@@ -131,7 +129,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         row, col = divmod(idx, n_cols)
         ax = axes[row, col]
         sim_map = cosine_sim[idx]
-        im = ax.imshow(sim_map, cmap='magma', vmin=0, vmax=1)
+        im = ax.imshow(sim_map, cmap='magma', vmin=-1, vmax=1)
         # make the patch with the highest similarity red
         # max_idx = np.unravel_index(np.argmax(sim_map), sim_map.shape)
         # ax.add_patch(plt.Rectangle((max_idx[1]-0.5, max_idx[0]-0.5), 1, 1, edgecolor='none', facecolor='black', lw=2))
@@ -157,9 +155,11 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         axes[row, col].axis('off')
     # Add a colorbar
     fig.subplots_adjust(right=0.88, wspace=0.1, hspace=0.2)
-    cbar_ax = fig.add_axes([0.90, 0.15, 0.015, 0.7])
+    # Adjust colorbar position to be closer to the plots
+    cbar_ax = fig.add_axes([0.885, 0.15, 0.015, 0.7])
     fig.colorbar(im, cax=cbar_ax, label='Cosine similarity')
-    fig.suptitle("Position embedding similarity (all patches)", fontsize=18)
+    # Move suptitle closer to the subplots
+    fig.suptitle("Position embedding similarity (all patches)", fontsize=18, y=0.96)
     plt.savefig("posembed_cosine_similarity_all.png", dpi=300)
     plt.show()
 
