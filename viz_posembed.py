@@ -124,7 +124,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
     n_cols = grid_size
     n_rows = grid_size
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 1.2, n_rows * 1.2))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 1.1, n_rows * 1.1))
     axes = np.array(axes).reshape(n_rows, n_cols)
 
     for idx in range(num_patches):
@@ -135,6 +135,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
         # # Set x/y ticks to show patch indices
         # ax.set_xticks([0, grid_size - 1])
         # ax.set_yticks([0, grid_size - 1])
+        ax.axes('off')  # Hide axes
         if row == n_rows - 1:
             ax.set_xlabel(f"col {col}", fontsize=9)
         else:
@@ -153,7 +154,6 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
     cbar_ax = fig.add_axes([0.90, 0.15, 0.015, 0.7])
     fig.colorbar(im, cax=cbar_ax, label='Cosine similarity')
     fig.suptitle("Position embedding similarity (all patches)", fontsize=18)
-    plt.tight_layout()
     plt.savefig("posembed_cosine_similarity_all.png", dpi=300)
     plt.show()
 
@@ -185,6 +185,39 @@ def plot_pearson(pos_embeds):
     plt.savefig("posembed_pearson_correlation.png", dpi=300)
     plt.show()
 
+def plot_tsne_pos_embeds(pos_embeds, grid_size=14, perplexity=30):
+    """
+    Visualize position embeddings using t-SNE, colored by spatial location.
+    """
+    from sklearn.manifold import TSNE
+    import matplotlib.pyplot as plt
+
+    # pos_embeds: [1, num_patches, dim] or [num_patches, dim]
+    if pos_embeds.ndim == 3:
+        pos_embeds_np = pos_embeds.squeeze(0).numpy()
+    else:
+        pos_embeds_np = pos_embeds.numpy()
+    num_patches = pos_embeds_np.shape[0]
+
+    # Compute t-SNE
+    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42)
+    tsne_coords = tsne.fit_transform(pos_embeds_np)
+
+    # Get grid coordinates for coloring
+    coords = np.array([(i, j) for i in range(grid_size) for j in range(grid_size)])[:num_patches]
+    x_coords = coords[:, 1]
+    y_coords = coords[:, 0]
+
+    plt.figure(figsize=(7, 6))
+    scatter = plt.scatter(tsne_coords[:, 0], tsne_coords[:, 1], c=x_coords + y_coords * grid_size, cmap='viridis', s=40)
+    plt.title("t-SNE of Position Embeddings (colored by patch index)")
+    plt.xlabel("t-SNE 1")
+    plt.ylabel("t-SNE 2")
+    plt.colorbar(scatter, label="Patch index (row*grid + col)")
+    plt.tight_layout()
+    plt.savefig("posembed_tsne.png", dpi=300)
+    plt.show()
+
 def main(checkpoint_path, val_dir):
     # Load model and extract position embeddings
     pos_embed, model = load_model_and_get_pos_embed(checkpoint_path)
@@ -204,9 +237,10 @@ def main(checkpoint_path, val_dir):
     # Plot Pearson correlation
     plot_pearson(pos_embeds)
     plot_cosine_similarity(pos_embed_cosine)
+    plot_tsne_pos_embeds(pos_embeds)
     
     # Plot results
-    fig, axes = plt.subplots(1, 1, figsize=(12, 6))
+    fig, axes = plt.subplots(1, 1, figsize=(6, 6))
     
     # # Original image
     # axes[0].imshow(original_img)
