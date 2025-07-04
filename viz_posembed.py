@@ -125,8 +125,8 @@ def main(checkpoint_path, val_dir):
 
 if __name__ == "__main__":
     # Default paths - update these to your actual paths
-    default_checkpoint = r"C:\Users\joren\Documents\_Uni\Master\Thesis\output\vim_extra_tiny_custom_transforms_heatmap\best_checkpoint.pth"
-    default_val_dir = r"C:\Users\joren\Documents\_Uni\Master\Thesis\val"
+    default_checkpoint = r"/storage/scratch/6403840/Master-Thesis/vim/output/vim_extra_tiny_custom_transforms_heatmap/best_checkpoint.pth"
+    default_val_dir = r"/storage/scratch/6403840/data/imagenet-tiny/val"
     
     # Get paths from command line arguments or use defaults
     import sys
