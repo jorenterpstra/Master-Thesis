@@ -16,7 +16,11 @@ def load_model_and_get_pos_embed(checkpoint_path):
     model = vim_extra_tiny_patch16_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2()
     
     # Load pretrained weights
-    model.load_pretrained(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    if 'model' in checkpoint:
+        model.load_state_dict(checkpoint['model'], strict=False)
+    else:
+        model.load_state_dict(checkpoint, strict=False)
     print("Model loaded successfully!")
     
     # Check if model has position embedding
