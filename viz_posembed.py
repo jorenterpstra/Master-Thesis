@@ -159,7 +159,7 @@ def plot_cosine_similarity(cosine_sim, grid_size=14):
     cbar_ax = fig.add_axes([0.90, 0.15, 0.015, 0.7])
     fig.colorbar(im, cax=cbar_ax, label='Cosine similarity')
     # Move suptitle closer to the subplots
-    fig.suptitle("Position embedding similarity (all patches)", fontsize=18, y=0.9)
+    fig.suptitle("Position embedding similarity (all patches)", fontsize=18, y=0.91)
     plt.savefig("posembed_cosine_similarity_all.png", dpi=300)
     plt.show()
 
