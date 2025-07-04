@@ -137,6 +137,7 @@ def main(checkpoint_path, val_dir):
     pos_embed_cosine = visualize_pos_embedding_cosine(pos_embeds)
     
     # Plot results
+    print(pos_embeds.shape)
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     
     # # Original image
